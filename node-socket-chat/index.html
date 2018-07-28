@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+    </style>
+  </head>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js" integrity="sha256-CutOzxCRucUsn6C6TcEYsauvvYilEniTXldPa6/wu0k=" crossorigin="anonymous"></script>
+  <script>
+  function guid() {
+  function s4() {
+    return Math.floor((1 + Math.random()) * 0x10000)
+      .toString(16)
+      .substring(1);
+  }
+  return s4() + "-"+ s4();
+}
+
+    $(function () {
+      var myID = guid();
+
+      var socket = io();
+      //SENDING
+      $('form').submit(function(){
+        var input = $('#m').val();
+        
+          var message = {
+              "timestamp" : new Date(),
+              "message" : input,
+              "from" : myID
+          };
+
+          console.log("Sending: ", message)
+        socket.emit('transmission', message);
+        //clear input
+        $('#m').val('');
+        return false;
+      });
+
+      //RECEIVING
+      socket.on('transmission', function(msg){
+            if(msg.from != myID){
+                console.log("Received: ", msg)
+                var date = new Date(msg.timestamp);
+        $('#messages').append($('<li>').text(moment(date).startOf('minute').fromNow()  + ": "+ msg.from + " sent " + msg.message));
+        }
+      });
+    });
+  </script>
+  <body>
+    <ul id="messages"></ul>
+    <form action="">
+      <input id="m" autocomplete="off" /><button>Send</button>
+    </form>
+  </body>
+</html>
