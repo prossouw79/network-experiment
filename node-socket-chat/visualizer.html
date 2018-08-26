@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.slim.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+<body>
+    <div id="graph"></div>
+</body>
+
+<script>
+    var socket = io();
+
+    var xUpdates = [];
+    var yUpdates = [];
+    var zUpdates = [];
+
+    Plotly.plot('graph', [{
+        type: 'scatter3d',
+        mode: 'lines',
+        x: xUpdates,
+        y: yUpdates,
+        z: zUpdates,
+        opacity: 1,
+        line: {
+            width: 6,
+            color: 0,
+            reversescale: false
+        }
+    }], {
+        height: 640
+    });
+</script>

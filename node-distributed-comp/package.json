@@ -1,5 +1,5 @@
 {
-  "name": "server",
+  "name": "distributed-comp",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -9,10 +9,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.16.3",
-    "http": "0.0.0",
-    "http-server": "^0.11.1",
-    "net": "^1.0.2",
-    "socket.io": "^2.1.1"
+    "supertask": "^2.1.0"
   }
 }

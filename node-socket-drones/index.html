@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>
+    Visualizer
+  </title>
+
+</head>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js" integrity="sha256-CutOzxCRucUsn6C6TcEYsauvvYilEniTXldPa6/wu0k="
+  crossorigin="anonymous"></script>
+<script>
+  //RECEIVING
+  socket.on('transmission', function (msg) {
+    console.log(msg)
+
+  });
+
+  var xUpdates = [];
+  var yUpdates = [];
+  var zUpdates = [];
+
+  Plotly.plot('graph', [{
+    type: 'scatter3d',
+    mode: 'lines',
+    x: xUpdates,
+    y: yUpdates,
+    z: zUpdates,
+    opacity: 1,
+    line: {
+      width: 6,
+      color: 0,
+      reversescale: false
+    }
+  }], {
+    height: 640
+  });
+</script>
+
+
+<body>
+  <div id="graph"></div>
+</body>
+
+
+</html>

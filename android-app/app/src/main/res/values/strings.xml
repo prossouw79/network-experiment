@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Drone Data Sim</string>
+    <string name="large_text">
+       "Click the Button below to send a socket message"
+    </string>
+    <string name="action_settings">Settings</string>
+</resources>

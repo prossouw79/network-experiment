@@ -50,7 +50,7 @@
       //RECEIVING
       socket.on('transmission', function(msg){
             if(msg.from != myID){
-                console.log("Received: ", msg)
+                console.log("Received: ", msg.message)
                 var date = new Date(msg.timestamp);
         $('#messages').append($('<li>').text(moment(date).startOf('minute').fromNow()  + ": "+ msg.from + " sent " + msg.message));
         }

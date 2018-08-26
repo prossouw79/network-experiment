@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.9.1/underscore-min.js"></script>
+
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha256-3edrmyuQ0w65f8gfBsqowzjJe2iM6n0nKciPUp8y+7E="
+    crossorigin="anonymous"></script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-table/1.12.1/bootstrap-table.min.css" />
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-table/1.12.1/bootstrap-table.min.js"></script>
+
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.bundle.min.js" integrity="sha384-pjaaA8dDz/5BgdFUPX6M/9SUZv4d12SUPF0axWc+VRZkx5xU3daN+lYb49+Ax+Tl"
+    crossorigin="anonymous"></script>
+
+<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.js"></script>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+    crossorigin="anonymous">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp"
+    crossorigin="anonymous">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.slim.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic">
+
+
+<link rel="stylesheet" href="//cdn.rawgit.com/necolas/normalize.css/master/normalize.css">
+
+
+<link rel="stylesheet" href="//cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css">
+
+
+<style>
+    table {
+        border-collapse: collapse;
+    }
+
+    table th,
+    table td {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
+    tr:nth-child(n + 15) {
+        display: none;
+    }
+
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+    }
+
+    .switch input {
+        display: none;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        -webkit-transition: .4s;
+        transition: .4s;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        -webkit-transition: .4s;
+        transition: .4s;
+    }
+
+    input:checked+.slider {
+        background-color: #2196F3;
+    }
+
+    input:focus+.slider {
+        box-shadow: 0 0 1px #2196F3;
+    }
+
+    input:checked+.slider:before {
+        -webkit-transform: translateX(26px);
+        -ms-transform: translateX(26px);
+        transform: translateX(26px);
+    }
+
+    /* Rounded sliders */
+    .slider.round {
+        border-radius: 34px;
+    }
+
+    .slider.round:before {
+        border-radius: 50%;
+    }
+</style>
+
+<body>
+    <div class="col-md-8">
+        <div id="movement_scatter3d"></div>
+        <br>
+        <div class="col-md-6">
+            <div id="bar_distance"></div>
+        </div>
+        <div class="col-md-6">
+            <div id="bar_speed"></div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+
+        <div class="col-md-12">
+            <strong>Map Update Rate (every 100-5000ms):</strong>
+            <input type="number" id="updateRate" min="100" max="5000" value="500" step="100" onchange="setUpdateRate()">
+        </div>
+        <div class="col-md-12">
+            <strong>Pause 3D plot updates:</strong>
+            <label class="switch">
+                <input type="checkbox" id="toggle3DUpdates" onclick="toggle3DUpdates()">
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <div class="col-md-12">
+            <strong>Trail Length (between 3 and 15):</strong>
+            <input type="number" id="trailLength" min="3" max="15" value="5" onchange="setTrailLength()">
+        </div>
+
+        <div class="col-md-12">
+            <strong>Position Updates:</strong>
+
+            <ul>
+                <li id="distanceUpdateRate"></li>
+                <li id="positionUpdateRate"></li>
+                <li id="totalUpdateRate"></li>
+            </ul>
+
+            <strong style="text-align:center">Update Log:</strong>
+            <table id="logTable">
+                <thead>
+                    <th>Node Name</th>
+                    <th>X</th>
+                    <th>Y</th>
+                    <th>Z</th>
+                    <th>Distance Moved</th>
+                    <th>Average Speed</th>
+                </thead>
+                <tbody style="padding:4px">
+
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+</body>
+
+<script>
+    var socket = io();
+
+    var drawTimeStamp = new Date().getTime();
+
+    var updateRate = 500;
+    var pause3DUpdates = false;
+    var trailLength = 5;
+
+    var updateCounter = {
+        "pos": 0,
+        "dist": 0
+    }
+
+    var lastCounter = {};
+
+    var positionUpdates = [];
+    var distancePairs = [];
+    var speedPairs = [];
+    var maxSpeedDetected = 1;
+
+
+    var _x = [];
+    var _y = [];
+    var _z = [];
+
+    socket.on('transmission', function (update) {
+        if (update.type == "positionUpdate") {
+            updateCounter.pos++;
+
+            var plot = JSON.parse(update.message);
+            positionUpdates.push(plot);
+
+            _x.push(plot.x);
+            _y.push(plot.Y);
+            _z.push(plot.Z);
+
+            if (isNaN(plot.AverageSpeed)) {
+                plot.AverageSpeed = +plot.AverageSpeed.toFixed(1);
+            }
+
+            if (plot.AverageSpeed > maxSpeedDetected)
+                maxSpeedDetected = plot.AverageSpeed;
+
+            var nodeExists = _.some(speedPairs, function (i) {
+                return i.Label == plot.NodeID;
+            });
+
+            var replacement = {
+                "Label": plot.NodeID,
+                "Speed": plot.AverageSpeed.toFixed(2)
+            };
+
+            var exists = _.some(speedPairs, function (i) {
+                return i.Label == plot.NodeID;
+            });
+
+            if (exists) {
+                _.extend(_.findWhere(speedPairs, { Label: plot.NodeID }), replacement);
+            } else {
+                speedPairs.push(replacement);
+            }
+
+            var newRowContent = `<tr><td>${plot.NodeID}</td><td>${plot.x.toFixed(1)}</td><td>${plot.y.toFixed(1)}</td><td>${plot.z.toFixed(1)}</td><td>${plot.DistanceMoved.toFixed(1)}</td><td>${plot.AverageSpeed.toFixed(1)}</td></tr>`
+
+            $("#logTable tbody").prepend(newRowContent);
+
+            deferredDraw();
+        }
+
+        if (update.type == "distanceUpdate") {
+            updateCounter.dist++;
+
+            var plot = JSON.parse(update.message);
+
+            var labelParts = [`${plot.From} to ${plot.To}`, `${plot.To} to ${plot.From}`];
+            labelParts.sort();
+            var label = labelParts[0];
+
+            var replacement = {
+                Distance: plot.Distance,
+                Label: label
+            };
+
+            var exists = _.some(distancePairs, function (i) {
+                return i.Label == label;
+            });
+
+            if (exists) {
+                _.extend(_.findWhere(distancePairs, { Label: label }), replacement);
+            } else {
+                distancePairs.push(replacement);
+            }
+
+            deferredDraw();
+        }
+    });
+
+    function deferredDraw() {
+        var dif = new Date().getTime() - drawTimeStamp;
+        if (dif >= updateRate) {
+
+            drawDistanceBars();
+            draw3DMap();
+            drawSpeedBars();
+
+            drawTimeStamp = new Date().getTime();
+        }
+    }
+
+    function toggle3DUpdates() {
+        pause3DUpdates = !pause3DUpdates;
+    }
+
+    function setTrailLength() {
+        trailLength = document.getElementById("trailLength").value;
+    }
+
+    function setUpdateRate() {
+        updateRate = document.getElementById("updateRate").value;
+    }
+
+    function drawDistanceBars() {
+        if (positionUpdates.length == 0)
+            return;
+
+        var groupedX = _.pluck(distancePairs, 'Label')
+        var groupedY = _.pluck(distancePairs, 'Distance');
+
+        var tData = [
+            {
+                type: 'bar',
+                x: groupedX,
+                y: groupedY
+            }
+        ];
+
+        Plotly.newPlot('bar_distance', tData, {
+            height: 400,
+            width: 600,
+            title: 'Distance Between Nodes'
+        });
+    }
+
+    function drawSpeedBars() {
+        if (positionUpdates.length == 0)
+            return;
+
+        var groupedX = _.pluck(speedPairs, 'Label')
+        var groupedY = _.pluck(speedPairs, 'Speed');
+
+        var sData = [
+            {
+                type: 'bar',
+                x: groupedX,
+                y: groupedY,
+                marker: {
+                    color: 'rgb(255,0,0)'
+                }
+            }
+        ];
+
+        Plotly.react('bar_speed', sData, {
+            height: 400,
+            width: 600,
+            title: 'Average Speed',
+            yaxis: {
+                range: [0, maxSpeedDetected]
+            }
+        });
+    }
+
+    function draw3DMap() {
+        if (positionUpdates.length == 0 || pause3DUpdates == true)
+            return;
+
+        var groupedPositionUpdates = _.groupBy(positionUpdates, function (u) {
+            return u.NodeID
+        });
+
+        var traces = [];
+
+        for (var node in groupedPositionUpdates) {
+            if (groupedPositionUpdates.hasOwnProperty(node)) {
+                var group = groupedPositionUpdates[node];
+
+                group = _.sortBy(group, function (g) {
+                    return g.PositionSequence;
+                });
+
+                var orderedX = _.last(_.pluck(group, "x"), trailLength);
+                var orderedY = _.last(_.pluck(group, "y"), trailLength);
+                var orderedZ = _.last(_.pluck(group, "z"), trailLength);
+
+                var orderedSpeed = _.pluck(group, "AverageSpeed");
+
+                traces.push({
+                    type: 'scatter3d',
+                    mode: 'lines',
+                    fill: 1,
+                    name: node,
+                    x: orderedX,
+                    y: orderedY,
+                    z: orderedZ,
+                    opacity: 0.8,
+                    line: {
+                        width: 4,
+                        color: 1,
+                        reversescale: false
+                    }
+                });
+            }
+        }
+
+        Plotly.react('movement_scatter3d', traces, {
+            height: 700,
+            width: 1000,
+            title: 'Node Movement'
+        });
+    }
+
+    setInterval(function () {
+        var difCounter = {
+            "Distance": updateCounter.dist - lastCounter.dist,
+            "Position": updateCounter.pos - lastCounter.pos
+        }
+
+        document.getElementById("distanceUpdateRate").innerHTML = `<strong>Distance updates/s:</strong> ${difCounter.Distance}`;
+        document.getElementById("positionUpdateRate").innerHTML = `<strong>Position updates/s:</strong> ${difCounter.Position}`;
+        document.getElementById("totalUpdateRate").innerHTML = `<strong>Total updates/s:</strong> ${difCounter.Distance + difCounter.Position}`;
+
+        //copy object
+        lastCounter = JSON.parse(JSON.stringify(updateCounter));
+    }, 1000);
+
+</script>
