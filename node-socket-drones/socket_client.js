@@ -18,13 +18,14 @@ function guid(parts = 1) {
 
     return guid;
 }
+
 var nodeID = guid(1);
 
 var positionUpdateRate = 500;
 var distanceUpdateRate = 750;
 var lastDistanceUpdate = new Date().getTime();
 var updateHistory = [];
-var otherNodes = [];
+var otherNodes = {};
 
 function distanceBetween(a, b) {
     var xD = Math.pow(a.x - b.x, 2);
@@ -242,18 +243,22 @@ function newPosition() {
     currentPosition.AverageSpeed = GetAverageSpeed();
     currentPosition.NodeID = nodeID;
 
-    console.log(currentPosition.NodeID, currentPosition.AverageSpeed)
+    //console.log(currentPosition.NodeID, currentPosition.AverageSpeed)
 
 
     updateHistory.push(currentPosition);
 
-    var updateMessage = {
+
+    broadcastCurrentPostion()
+}
+
+function broadcastCurrentPostion(){
+    var positionUpdateMessage = {
         "type": "positionUpdate",
         "message": JSON.stringify(currentPosition),
         "from": nodeID
     }
-
-    socket.emit('transmission', updateMessage);
+    socket.emit('transmission', positionUpdateMessage);
 }
 
 //periodically refresh position
@@ -269,7 +274,6 @@ socket.on('connect', function (socket) {
 });
 
 socket.on('transmission', function (update) {
-
     //maintain list of other nodes
     if (update.from !== nodeID && update.type == "positionUpdate") {
 
@@ -280,7 +284,36 @@ socket.on('transmission', function (update) {
             y: message.y,
             z: message.z
         }
-        //console.log("OtherNodes", otherNodes);
+
+        //broadcast othernodes
+        var fieldKnowledgeUpdateMessage= {
+            "type": "fieldKnowledgeUpdate",
+            "message": JSON.stringify(otherNodes),
+            "from": nodeID
+        }
+        socket.emit('transmission', fieldKnowledgeUpdateMessage);
+    }
+
+    //get other nodes' field knowledge
+    if (update.from !== nodeID && update.type == "fieldKnowledgeUpdate") {
+
+        var message = JSON.parse(update.message);
+
+        //console.log(`FieldKnowledge from ${update.from}`, message);
+
+        //check if other node knows about this node
+        if(message[nodeID]){
+            //compare other node's knowledge to this nodes
+            let t = message[nodeID];
+            let distance = distanceBetween(currentPosition,t);
+
+            if(distance > 0){
+                console.log(`Mismatch between ${update.from} and ${nodeID}. Distance: ${distance}`);
+                broadcastCurrentPostion()
+            }
+        }else{
+            broadcastCurrentPostion()
+        }
     }
 
     //handle positionUpdates to generate distanceUpdates

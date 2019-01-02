@@ -198,6 +198,7 @@
 
     socket.on('transmission', function (update) {
         if (update.type == "positionUpdate") {
+            console.log('positionUpdate', update.message)
             updateCounter.pos++;
 
             var plot = JSON.parse(update.message);
