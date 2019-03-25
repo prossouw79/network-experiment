@@ -6,4 +6,4 @@ redis-server --port 7777
 node producer.js
 
 # Start consumer
-node consumer.js 
+node consumer.js
