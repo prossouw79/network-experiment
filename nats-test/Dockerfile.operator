@@ -1,0 +1,11 @@
+FROM pietersynthesis/nats-drone-sim:base
+WORKDIR /opt
+
+#works at build time
+ARG FILENAME
+#works at runtime
+ENV JS ${FILENAME}
+
+COPY $FILENAME .
+
+CMD node ${JS}

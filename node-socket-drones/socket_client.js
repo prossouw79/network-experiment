@@ -1,41 +1,20 @@
-var io = require('socket.io-client');
-var socket = io.connect('http://localhost:3000', {
+let io = require('socket.io-client');
+let socket = io.connect('http://localhost:7000', {
     reconnect: true
 });
+//register functions and objects
+let _guid = require('./util/guid.js');
+let _distanceBetween = require('./util/distance.js');
+let _averageSpeed = require('./util/averageSpeed.js')
+let _moveRandom = require('./util/moveRandom.js');
+let _moveTo = require('./util/moveTo.js')
+let _moveFrom = require('./util/moveFrom.js')
+let model = require('./util/model.js');
 
-function guid(parts = 1) {
-    function s4() {
-        return Math.floor((1 + Math.random()) * 0x10000)
-            .toString(16)
-            .substring(1);
-    }
-    var guid = "";
-    for (var c = 0; c < parts; c++) {
-        guid += s4() + "-";
-    }
 
-    guid = guid.substring(0, guid.length - 1);
-
-    return guid;
-}
-
-var nodeID = guid(1);
-
-var positionUpdateRate = 500;
-var distanceUpdateRate = 750;
-var lastDistanceUpdate = new Date().getTime();
-var updateHistory = [];
-var otherNodes = {};
-
-function distanceBetween(a, b) {
-    var xD = Math.pow(a.x - b.x, 2);
-    var yD = Math.pow(a.y - b.y, 2);
-    var zD = Math.pow(a.z - b.z, 2);
-
-    return Math.sqrt(xD + yD + zD);
-}
-
-var currentPosition = {
+//initial local state
+let nodeID = _guid(1);
+let currentPosition = {
     "NodeID": nodeID,
     "x": 0,
     "y": 0,
@@ -43,116 +22,29 @@ var currentPosition = {
     "DistanceMoved": 0,
     "AverageSpeed": 0
 }
+let positionSequence = 0;
 
-function RandomDistance(min, max, floor = false) {
-    var dif = (max - min);
-    var value = (Math.random() * dif) + min;
-
-    if (floor)
-        return Math.floor(value);
-
-    return value;
-}
-
-function GetAverageSpeed() {
-    var totalDistance = 0;
-    var consider = 10;
-
-    if (updateHistory.length <= consider) {
-        updateHistory.forEach(pos => {
-            totalDistance += pos.DistanceMoved;
-        });
-
-        var totalTimeSeconds = updateHistory.length * positionUpdateRate / 1000;
-
-        return totalDistance / totalTimeSeconds;
-    } else {
-        for (var cnt = updateHistory.length - (consider + 1); cnt < updateHistory.length; cnt++) {
-            totalDistance += updateHistory[cnt].DistanceMoved;
-
-            var totalTimeSeconds = consider * positionUpdateRate / 1000;
-
-            return totalDistance / totalTimeSeconds;
-        }
-    }
-}
-
-var positionSequence = 0;
-
-function moveRandom(maxSpeed) {
-    currentPosition.x += RandomDistance(-1 * maxSpeed, maxSpeed);
-    currentPosition.y += RandomDistance(-1 * maxSpeed, maxSpeed);
-    currentPosition.z += RandomDistance(-1 * maxSpeed, maxSpeed);
-}
-
-function simpleMoveTo(origin, target, maxDistance) {
-    var xDif = origin.x - target.x;
-    var yDif = origin.y - target.y;
-    var zDif = origin.z - target.z;
-
-    if (xDif > 0) {
-        origin.x = origin.x - maxDistance;
-    } else {
-        origin.x = origin.x + maxDistance;
-    }
-
-    if (yDif > 0) {
-        origin.y = origin.y - maxDistance;
-    } else {
-        origin.y = origin.y + maxDistance;
-    }
-
-    if (zDif > 0) {
-        origin.z = origin.z - maxDistance;
-    } else {
-        origin.z = origin.z + maxDistance;
-    }
-}
-
-function simpleMoveFrom(origin, target, maxDistance) {
-    var xDif = origin.x - target.x;
-    var yDif = origin.y - target.y;
-    var zDif = origin.z - target.z;
-
-    if (xDif < 0) {
-        origin.x = origin.x - maxDistance;
-    } else {
-        origin.x = origin.x + maxDistance;
-    }
-
-    if (yDif < 0) {
-        origin.y = origin.y - maxDistance;
-    } else {
-        origin.y = origin.y + maxDistance;
-    }
-
-    if (zDif < 0) {
-        origin.z = origin.z - maxDistance;
-    } else {
-        origin.z = origin.z + maxDistance;
-    }
-}
 
 function newPosition() {
-    var copyPosition = JSON.parse(JSON.stringify(currentPosition));
+    let copyPosition = JSON.parse(JSON.stringify(currentPosition));
 
-    var limit = 30;
+    let limit = 30;
 
-    var maxSpeed = 2;
+    let maxSpeed = 2;
 
-    var rangeUpperLimit = 10;
-    var rangeLowerLimit = 2;
+    let rangeUpperLimit = 10;
+    let rangeLowerLimit = 2;
 
-    var closestNode = null;
+    let closestNode = null;
 
-    var sumX = [];
-    var sumY = [];
-    var sumZ = [];
+    let sumX = [];
+    let sumY = [];
+    let sumZ = [];
 
-    if (Object.keys(otherNodes).length > 0) {
-        for (var tmpNodeID in otherNodes) {
-            if (otherNodes.hasOwnProperty(tmpNodeID)) {
-                var node = otherNodes[tmpNodeID];
+    if (model.otherNodes && Object.keys(model.otherNodes).length > 0) {
+        for (let tmpNodeID in model.otherNodes) {
+            if (model.otherNodes.hasOwnProperty(tmpNodeID)) {
+                let node = model.otherNodes[tmpNodeID];
                 sumX.push(node.x);
                 sumY.push(node.y);
                 sumZ.push(node.z);
@@ -160,39 +52,39 @@ function newPosition() {
         }
     }
     //get average X
-    var xsum, xavg = 0;
+    let xsum, xavg = 0;
     if (sumX.length) {
         xsum = sumX.reduce(function (a, b) { return a + b; });
         xavg = xsum / sumX.length;
     }
 
     //get average Y
-    var ysum, yavg = 0;
+    let ysum, yavg = 0;
     if (sumY.length) {
         ysum = sumY.reduce(function (a, b) { return a + b; });
         yavg = ysum / sumY.length;
     }
 
     //get average Z
-    var zsum, zavg = 0;
+    let zsum, zavg = 0;
     if (sumZ.length) {
         zsum = sumZ.reduce(function (a, b) { return a + b; });
         zavg = zsum / sumZ.length;
     }
 
 
-    if (Object.keys(otherNodes).length > 0) {
-        for (var tmpNodeID in otherNodes) {
-            if (otherNodes.hasOwnProperty(tmpNodeID)) {
+    if (model.otherNodes && Object.keys(model.otherNodes).length > 0) {
+        for (let tmpNodeID in model.otherNodes) {
+            if (model.otherNodes.hasOwnProperty(tmpNodeID)) {
                 // do stuff
-                var node = otherNodes[tmpNodeID];
-                var distance = distanceBetween(node, currentPosition);
+                let node = model.otherNodes[tmpNodeID];
+                let distance = _distanceBetween(node, currentPosition);
 
                 if (distance > 0) {
                     if (closestNode == null) {
                         closestNode = node;
                     } else {
-                        if (distanceBetween(node, currentPosition) < distanceBetween(node, closestNode)) {
+                        if (_distanceBetween(node, currentPosition) < _distanceBetween(node, closestNode)) {
                             closestNode = node;
                         }
                     }
@@ -201,35 +93,35 @@ function newPosition() {
         }
     } else {
         //move randomly
-        moveRandom(maxSpeed);
+        _moveRandom(maxSpeed, currentPosition);
     }
 
     if (closestNode != null) {
         // console.log("Position before: ", currentPosition);
-        var distanceToClosestNode = distanceBetween(currentPosition, closestNode);
+        let distanceToClosestNode = _distanceBetween(currentPosition, closestNode);
 
         if (distanceToClosestNode >= rangeLowerLimit && distanceToClosestNode <= rangeUpperLimit) {
-            moveRandom(maxSpeed)
+            currentPosition = _moveRandom(maxSpeed,currentPosition)
         } else if (distanceToClosestNode < rangeLowerLimit) {
             //move farther from closestNode
-            simpleMoveFrom(currentPosition, closestNode, maxSpeed);
+            currentPosition = _moveFrom(currentPosition, closestNode, maxSpeed);
 
         } else if (distanceToClosestNode > rangeUpperLimit) {
             //move closer to closestNode
-            simpleMoveTo(currentPosition, closestNode, maxSpeed);
+            currentPosition = _moveTo(currentPosition, closestNode, maxSpeed);
         }
         //console.log("Position after: ", currentPosition);
     } else {
         //move randomly
-        moveRandom(maxSpeed);
+        currentPosition = _moveRandom(maxSpeed, currentPosition);
     }
 
-    currentPosition.DistanceMoved = distanceBetween(copyPosition, currentPosition);
+    currentPosition.DistanceMoved = _distanceBetween(copyPosition, currentPosition);
     currentPosition.PositionSequence = positionSequence++;
 
 
-    if (updateHistory.length > limit) {
-        updateHistory.sort(function (a, b) {
+    if (model.updateHistory && model.updateHistory.length > limit) {
+        model.updateHistory.sort(function (a, b) {
             if (a.positionSequence < b.positionSequence)
                 return -1;
             if (a.positionSequence > b.positionSequence)
@@ -237,23 +129,18 @@ function newPosition() {
             return 0;
         });
 
-        updateHistory = updateHistory.slice(updateHistory.length - limit, limit);
+        model.updateHistory = model.updateHistory.slice(model.updateHistory.length - limit, limit);
     }
 
-    currentPosition.AverageSpeed = GetAverageSpeed();
+    currentPosition.AverageSpeed = _averageSpeed(model.updateHistory, model.positionUpdateRate);
     currentPosition.NodeID = nodeID;
 
-    //console.log(currentPosition.NodeID, currentPosition.AverageSpeed)
-
-
-    updateHistory.push(currentPosition);
-
-
+    model.updateHistory.push(currentPosition);
     broadcastCurrentPostion()
 }
 
-function broadcastCurrentPostion(){
-    var positionUpdateMessage = {
+function broadcastCurrentPostion() {
+    let positionUpdateMessage = {
         "type": "positionUpdate",
         "message": JSON.stringify(currentPosition),
         "from": nodeID
@@ -264,7 +151,7 @@ function broadcastCurrentPostion(){
 //periodically refresh position
 setInterval(function () {
     newPosition();
-}, positionUpdateRate);
+}, model.positionUpdateRate);
 
 
 
@@ -277,18 +164,18 @@ socket.on('transmission', function (update) {
     //maintain list of other nodes
     if (update.from !== nodeID && update.type == "positionUpdate") {
 
-        var message = JSON.parse(update.message);
+        let message = JSON.parse(update.message);
 
-        otherNodes[message.NodeID] = {
+        model.otherNodes[message.NodeID] = {
             x: message.x,
             y: message.y,
             z: message.z
         }
 
-        //broadcast othernodes
-        var fieldKnowledgeUpdateMessage= {
+        //broadcast model.otherNodes
+        let fieldKnowledgeUpdateMessage = {
             "type": "fieldKnowledgeUpdate",
-            "message": JSON.stringify(otherNodes),
+            "message": JSON.stringify(model.otherNodes),
             "from": nodeID
         }
         socket.emit('transmission', fieldKnowledgeUpdateMessage);
@@ -297,36 +184,36 @@ socket.on('transmission', function (update) {
     //get other nodes' field knowledge
     if (update.from !== nodeID && update.type == "fieldKnowledgeUpdate") {
 
-        var message = JSON.parse(update.message);
+        let message = JSON.parse(update.message);
 
         //console.log(`FieldKnowledge from ${update.from}`, message);
 
         //check if other node knows about this node
-        if(message[nodeID]){
+        if (message[nodeID]) {
             //compare other node's knowledge to this nodes
             let t = message[nodeID];
-            let distance = distanceBetween(currentPosition,t);
+            let distance = _distanceBetween(currentPosition, t);
 
-            if(distance > 0){
+            if (distance > 0) {
                 console.log(`Mismatch between ${update.from} and ${nodeID}. Distance: ${distance}`);
                 broadcastCurrentPostion()
             }
-        }else{
+        } else {
             broadcastCurrentPostion()
         }
     }
 
     //handle positionUpdates to generate distanceUpdates
     if (update.from !== nodeID && update.type == "positionUpdate") {
-        var now = new Date().getTime();
-        if (now - lastDistanceUpdate < distanceUpdateRate)
+        let now = new Date().getTime();
+        if (now - model.lastDistanceUpdate < model.distanceUpdateRate)
             return;
 
-        var message = JSON.parse(update.message);
+        let message = JSON.parse(update.message);
 
-        var d = distanceBetween(currentPosition, message);
+        let d = _distanceBetween(currentPosition, message);
         //console.log(`Distance to ${update.from}: ${d}`)
-        var distanceUpdate = {
+        let distanceUpdate = {
             "type": "distanceUpdate",
             "message": JSON.stringify({
                 From: nodeID,
@@ -337,6 +224,6 @@ socket.on('transmission', function (update) {
         }
 
         socket.emit('transmission', distanceUpdate);
-        lastDistanceUpdate = now;
+        model.lastDistanceUpdate = now;
     }
 });

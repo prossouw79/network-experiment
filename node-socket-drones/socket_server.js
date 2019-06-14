@@ -1,8 +1,8 @@
-var app = require('express')();
-var http = require('http').Server(app);
-var io = require('socket.io')(http);
+let app = require('express')();
+let http = require('http').Server(app);
+let io = require('socket.io')(http);
 
-var port = 3000;
+let port = 7000;
 
 app.get('/', function (req, res) {
   res.sendFile(__dirname + '/visualizer.html');

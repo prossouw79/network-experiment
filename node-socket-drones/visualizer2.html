@@ -8,7 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script>
-  var socket = io();
+  let socket = io();
 
   //RECEIVING
   socket.on('transmission', function (update) {

@@ -1,0 +1,82 @@
+networks: 
+  nats-network: 
+    driver: overlay
+    ipam: 
+      config: 
+        - subnet: 192.10.10.0/24
+      driver: default
+services: 
+  nats-1: 
+    command: 
+      - "-D"
+      - "-p"
+      - "4222"
+      - "-cluster"
+      - "nats://192.10.10.10:6222"
+    expose:
+      - "6222"
+    image: "nats:1.3.0"
+    networks: 
+      nats-network: 
+        ipv4_address: "192.10.10.10"
+    ports:
+      - "14222:4222"
+  nats-2: 
+    command: 
+      - "-D"
+      - "-p"
+      - "4222"
+      - "-cluster"
+      - "nats://192.10.10.20:6222"
+      - "-routes"
+      - "nats://192.10.10.10:6222"
+    image: "nats:1.3.0"
+    expose:
+      - "6222"
+    networks: 
+      nats-network: 
+        ipv4_address: "192.10.10.20"
+    ports:
+      - "24222:4222"
+  nats-3: 
+    command: 
+      - "-D"
+      - "-p"
+      - "4222"
+      - "-cluster"
+      - "nats://192.10.10.30:6222"
+      - "-routes"
+      - "nats://192.10.10.10:6222"
+    image: "nats:1.3.0"
+    expose:
+      - "6222"
+    networks: 
+      nats-network: 
+        ipv4_address: "192.10.10.30"
+    ports:
+      - "34222:4222"
+  position-update:
+    image: "pietersynthesis/nats-drone-sim:positionUpdate"
+    deploy:
+      mode: global
+    networks: 
+      - nats-network
+  distance-triggers:
+    image: "pietersynthesis/nats-drone-sim:distanceTriggers"
+    deploy:
+      mode: global
+    networks: 
+      - nats-network
+  distance-calculator:
+    image: "pietersynthesis/nats-drone-sim:distanceCalculator"
+    deploy:
+      mode: global
+    networks: 
+      - nats-network
+  dead-node-detector:
+    deploy:
+      mode: global
+    image: "pietersynthesis/nats-drone-sim:deadNodeDetector"
+    networks: 
+      - nats-network
+version: "3"

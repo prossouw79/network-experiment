@@ -171,37 +171,37 @@
 </body>
 
 <script>
-    var socket = io();
+    let socket = io();
 
-    var drawTimeStamp = new Date().getTime();
+    let drawTimeStamp = new Date().getTime();
 
-    var updateRate = 500;
-    var pause3DUpdates = false;
-    var trailLength = 5;
+    let updateRate = 500;
+    let pause3DUpdates = false;
+    let trailLength = 5;
 
-    var updateCounter = {
+    let updateCounter = {
         "pos": 0,
         "dist": 0
     }
 
-    var lastCounter = {};
+    let lastCounter = {};
 
-    var positionUpdates = [];
-    var distancePairs = [];
-    var speedPairs = [];
-    var maxSpeedDetected = 1;
+    let positionUpdates = [];
+    let distancePairs = [];
+    let speedPairs = [];
+    let maxSpeedDetected = 1;
 
 
-    var _x = [];
-    var _y = [];
-    var _z = [];
+    let _x = [];
+    let _y = [];
+    let _z = [];
 
     socket.on('transmission', function (update) {
         if (update.type == "positionUpdate") {
             console.log('positionUpdate', update.message)
             updateCounter.pos++;
 
-            var plot = JSON.parse(update.message);
+            let plot = JSON.parse(update.message);
             positionUpdates.push(plot);
 
             _x.push(plot.x);
@@ -215,16 +215,16 @@
             if (plot.AverageSpeed > maxSpeedDetected)
                 maxSpeedDetected = plot.AverageSpeed;
 
-            var nodeExists = _.some(speedPairs, function (i) {
+            let nodeExists = _.some(speedPairs, function (i) {
                 return i.Label == plot.NodeID;
             });
 
-            var replacement = {
+            let replacement = {
                 "Label": plot.NodeID,
                 "Speed": plot.AverageSpeed.toFixed(2)
             };
 
-            var exists = _.some(speedPairs, function (i) {
+            let exists = _.some(speedPairs, function (i) {
                 return i.Label == plot.NodeID;
             });
 
@@ -234,7 +234,7 @@
                 speedPairs.push(replacement);
             }
 
-            var newRowContent = `<tr><td>${plot.NodeID}</td><td>${plot.x.toFixed(1)}</td><td>${plot.y.toFixed(1)}</td><td>${plot.z.toFixed(1)}</td><td>${plot.DistanceMoved.toFixed(1)}</td><td>${plot.AverageSpeed.toFixed(1)}</td></tr>`
+            let newRowContent = `<tr><td>${plot.NodeID}</td><td>${plot.x.toFixed(1)}</td><td>${plot.y.toFixed(1)}</td><td>${plot.z.toFixed(1)}</td><td>${plot.DistanceMoved.toFixed(1)}</td><td>${plot.AverageSpeed.toFixed(1)}</td></tr>`
 
             $("#logTable tbody").prepend(newRowContent);
 
@@ -244,18 +244,18 @@
         if (update.type == "distanceUpdate") {
             updateCounter.dist++;
 
-            var plot = JSON.parse(update.message);
+            let plot = JSON.parse(update.message);
 
-            var labelParts = [`${plot.From} to ${plot.To}`, `${plot.To} to ${plot.From}`];
+            let labelParts = [`${plot.From} to ${plot.To}`, `${plot.To} to ${plot.From}`];
             labelParts.sort();
-            var label = labelParts[0];
+            let label = labelParts[0];
 
-            var replacement = {
+            let replacement = {
                 Distance: plot.Distance,
                 Label: label
             };
 
-            var exists = _.some(distancePairs, function (i) {
+            let exists = _.some(distancePairs, function (i) {
                 return i.Label == label;
             });
 
@@ -270,7 +270,7 @@
     });
 
     function deferredDraw() {
-        var dif = new Date().getTime() - drawTimeStamp;
+        let dif = new Date().getTime() - drawTimeStamp;
         if (dif >= updateRate) {
 
             drawDistanceBars();
@@ -297,10 +297,10 @@
         if (positionUpdates.length == 0)
             return;
 
-        var groupedX = _.pluck(distancePairs, 'Label')
-        var groupedY = _.pluck(distancePairs, 'Distance');
+        let groupedX = _.pluck(distancePairs, 'Label')
+        let groupedY = _.pluck(distancePairs, 'Distance');
 
-        var tData = [
+        let tData = [
             {
                 type: 'bar',
                 x: groupedX,
@@ -319,10 +319,10 @@
         if (positionUpdates.length == 0)
             return;
 
-        var groupedX = _.pluck(speedPairs, 'Label')
-        var groupedY = _.pluck(speedPairs, 'Speed');
+        let groupedX = _.pluck(speedPairs, 'Label')
+        let groupedY = _.pluck(speedPairs, 'Speed');
 
-        var sData = [
+        let sData = [
             {
                 type: 'bar',
                 x: groupedX,
@@ -347,25 +347,25 @@
         if (positionUpdates.length == 0 || pause3DUpdates == true)
             return;
 
-        var groupedPositionUpdates = _.groupBy(positionUpdates, function (u) {
+        let groupedPositionUpdates = _.groupBy(positionUpdates, function (u) {
             return u.NodeID
         });
 
-        var traces = [];
+        let traces = [];
 
-        for (var node in groupedPositionUpdates) {
+        for (let node in groupedPositionUpdates) {
             if (groupedPositionUpdates.hasOwnProperty(node)) {
-                var group = groupedPositionUpdates[node];
+                let group = groupedPositionUpdates[node];
 
                 group = _.sortBy(group, function (g) {
                     return g.PositionSequence;
                 });
 
-                var orderedX = _.last(_.pluck(group, "x"), trailLength);
-                var orderedY = _.last(_.pluck(group, "y"), trailLength);
-                var orderedZ = _.last(_.pluck(group, "z"), trailLength);
+                let orderedX = _.last(_.pluck(group, "x"), trailLength);
+                let orderedY = _.last(_.pluck(group, "y"), trailLength);
+                let orderedZ = _.last(_.pluck(group, "z"), trailLength);
 
-                var orderedSpeed = _.pluck(group, "AverageSpeed");
+                let orderedSpeed = _.pluck(group, "AverageSpeed");
 
                 traces.push({
                     type: 'scatter3d',
@@ -393,7 +393,7 @@
     }
 
     setInterval(function () {
-        var difCounter = {
+        let difCounter = {
             "Distance": updateCounter.dist - lastCounter.dist,
             "Position": updateCounter.pos - lastCounter.pos
         }
