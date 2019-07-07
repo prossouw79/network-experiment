@@ -2,7 +2,7 @@
   "name": "kafka-test",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "C_movement_calculator.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -11,6 +11,7 @@
   "dependencies": {
     "as-table": "^1.0.52",
     "dotenv": "^8.0.0",
+    "minimist": "^1.2.0",
     "node-rdkafka": "^2.7.0",
     "stream-filter": "^2.1.0",
     "uuid": "^3.3.2"

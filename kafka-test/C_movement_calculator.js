@@ -5,11 +5,7 @@ const asTable = require('as-table')
 //functions 
 const getRandomInt = require('./util/randomInt');
 let _guid = require('./util/guid.js');
-let _distanceBetween = require('./util/distance.js');
-let _averageSpeed = require('./util/averageSpeed.js')
-let _moveRandom = require('./util/moveRandom.js');
-let _moveTo = require('./util/moveTo.js')
-let _moveFrom = require('./util/moveFrom.js')
+let produceMessage = require('./util/kafka_produceMessage.js');
 
 let nodePositions = {}
 let nodeDistances = {}
@@ -26,11 +22,16 @@ console.log(asTable([initObj]))
 
 const _distance_topic = process.env.KAFKA_TOPIC_DISTANCE;
 const _movement_topic = process.env.KAFKA_TOPIC_MOVEMENT;
+let min_threshold = 5;
+let max_threshold = 25;
+
 
 //#region Position Consumer
 var position_consumer = new Kafka.KafkaConsumer({
   //'debug': 'all',
   'metadata.broker.list': `${process.env.KAFKA_BROKER}:${process.env.KAFKA_BROKER_PORT}`,
+  'queue.buffering.max.kbytes': process.env.KAFKA_QUEUE_BUFFER,
+  'queue.buffering.max.kbytes': 1000000,
   'group.id': `distance-movement-calculators`,
   'client.id': `distance-movement-calculator-${operatorID}`,
   'enable.auto.commit': true,
@@ -59,6 +60,7 @@ position_consumer.on('event.log', function (log) {
 position_consumer.on('event.error', function (err) {
   console.error('Error from consumer');
   console.error(err);
+  process.exit(1);
 });
 
 position_consumer.on('ready', function (arg) {
@@ -73,28 +75,83 @@ position_consumer.on('ready', function (arg) {
 position_consumer.on('data', function (m) {
   // Output the actual message contents
   // console.log(JSON.stringify(m));
-  let receivedObj = JSON.parse(m.value.toString());
 
-  nodePositions[receivedObj.NodeID] = {
-    x: receivedObj.x,
-    y: receivedObj.y,
-    z: receivedObj.z
-  }
+  let distancePairs = JSON.parse(m.value.toString());
+  // console.log(distancePairs);
 
-  Object.keys(nodePositions).forEach(nodeA => {
-    Object.keys(nodePositions).forEach(nodeB => {
-      if (nodeA != nodeB) {
-        let d = _distanceBetween(nodePositions[nodeA], nodePositions[nodeB]);
+  let nodesTooClose = distancePairs
+    .filter(x => x.distance < min_threshold);
 
-        if (!nodeDistances[nodeA])
-          nodeDistances[nodeA] = {};
+  let nodesTooFar = distancePairs
+    .filter(x => x.distance > max_threshold);
 
-          nodeDistances[nodeA][nodeB] = d;
-      }
-    });
-    let message = JSON.stringify(nodeDistances);
-    produceMessage(distance_producer,_movement_topic,message);
+  console.log('Too Close\t', nodesTooClose.map(x => {
+    return {
+      "A": x.A.NodeID,
+      "B": x.B.NodeID
+    }
+  }));
+  console.log('Too Far\t\t', nodesTooFar.map(x => {
+    return {
+      "A": x.A.NodeID,
+      "B": x.B.NodeID
+    }
+  }));
+
+  nodesTooClose.forEach(node => {
+    //A needs to move further from B
+    let messageA = {
+      "Movement": "away",
+      "Target": node.B
+    }
+    //B needs to move further from A
+    let messageB = {
+      "Movement": "away",
+      "Target": node.A
+    }
+
+    produceMessage(movement_producer, `${_movement_topic}_${node.A.NodeID}`, JSON.stringify(messageA));
+    produceMessage(movement_producer, `${_movement_topic}_${node.B.NodeID}`, JSON.stringify(messageB));
   });
+
+
+  nodesTooFar.forEach(node => {
+    //A needs to move further from B
+    let messageA = {
+      "Movement": "towards",
+      "Target": node.B
+    }
+    //B needs to move further from A
+    let messageB = {
+      "Movement": "towards",
+      "Target": node.A
+    }
+
+    produceMessage(movement_producer, `${_movement_topic}_${node.A.NodeID}`, JSON.stringify(messageA));
+    produceMessage(movement_producer, `${_movement_topic}_${node.B.NodeID}`, JSON.stringify(messageB));
+  });
+
+
+
+  // Object.keys(distancePairs)
+  //   .forEach(nodeID => {
+  //     let relativeDistances = distancePairs[nodeID];
+
+  //     let nodesTooClose =
+  //       Object.keys(relativeDistances)
+  //         .filter(x => relativeDistances[x] < min_threshold);
+
+  //     let nodesTooFar =
+  //       Object.keys(relativeDistances)
+  //         .filter(x => relativeDistances[x] > max_threshold);
+
+  //     console.log('Too Close\t', nodeID, nodesTooClose);
+  //     console.log('Too Far\t\t', nodeID, nodesTooFar);
+
+
+
+
+  //   });
 });
 
 position_consumer.on('disconnected', function (arg) {
@@ -107,60 +164,33 @@ position_consumer.connect();
 //#endregion
 
 
-//#region Distance Producer
+//#region Movement Producer
 
-var distance_producer = new Kafka.Producer({
+var movement_producer = new Kafka.Producer({
   'metadata.broker.list': `${process.env.KAFKA_BROKER}:${process.env.KAFKA_BROKER_PORT}`,
+  'queue.buffering.max.kbytes': process.env.KAFKA_QUEUE_BUFFER,
   'dr_cb': true
 });
 
 
 // Connect to the broker manually
-distance_producer.connect();
+movement_producer.connect();
 
 // Wait for the ready event before proceeding
-distance_producer.on('ready', function() {
+movement_producer.on('ready', function () {
   console.log('Producer ready')
 });
 
-distance_producer.on('delivery-report', function(err, report) {
+movement_producer.on('delivery-report', function (err, report) {
   // Report of delivery statistics here:
   //
   console.log(report);
 });
 
-function produceMessage(producer,topic,message) {
-  try {
-      console.log('Sending', message)
-
-      let buffer =  Buffer.from(message);
-      // console.log(message,buffer)
-
-      producer.produce(
-        // Topic to send the message to
-        topic,
-        // optionally we can manually specify a partition for the message
-        // this defaults to -1 - which will use librdkafka's default partitioner (consistent random for keyed messages, random for unkeyed messages)
-        null,
-        // Message to send. Must be a buffer
-        buffer,
-        // for keyed messages, we also specify the key - note that this field is optional
-        operatorID,
-        // you can send a timestamp here. If your broker version supports it,
-        // it will get added. Otherwise, we default to 0
-        Date.now(),
-        // you can send an opaque token here, which gets passed along
-        // to your delivery reports
-      );
-    } catch (err) {
-      console.error('A problem occurred when sending our message');
-      console.error(err);
-    }
-}
-
 // Any errors we encounter, including connection errors
-distance_producer.on('event.error', function(err) {
+movement_producer.on('event.error', function (err) {
   console.error('Error from producer');
   console.error(err);
+  process.exit(1);
 })
 //#endregion

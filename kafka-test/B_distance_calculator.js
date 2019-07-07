@@ -9,7 +9,7 @@ let _distanceBetween = require('./util/distance.js');
 let produceMessage = require('./util/kafka_produceMessage.js');
 
 let nodePositions = {}
-let nodeDistances = {}
+let nodeDistances = []
 
 let operatorID = _guid(1);
 dotenv.config();
@@ -28,6 +28,7 @@ const _distance_topic = process.env.KAFKA_TOPIC_DISTANCE;
 var position_consumer = new Kafka.KafkaConsumer({
   //'debug': 'all',
   'metadata.broker.list': `${process.env.KAFKA_BROKER}:${process.env.KAFKA_BROKER_PORT}`,
+  'queue.buffering.max.kbytes': process.env.KAFKA_QUEUE_BUFFER,
   'group.id': `position-distance-calculators`,
   'client.id': `position-distance-calculator-${operatorID}`,
   'enable.auto.commit': true,
@@ -55,6 +56,7 @@ position_consumer.on('event.log', function (log) {
 position_consumer.on('event.error', function (err) {
   console.error('Error from consumer');
   console.error(err);
+  process.exit(1);
 });
 
 position_consumer.on('ready', function (arg) {
@@ -70,27 +72,28 @@ position_consumer.on('data', function (m) {
   // Output the actual message contents
   // console.log(JSON.stringify(m));
   let receivedObj = JSON.parse(m.value.toString());
+  // console.log(receivedObj);
+  nodePositions[receivedObj.NodeID] = receivedObj;
+  nodeDistances = [];  
 
-  nodePositions[receivedObj.NodeID] = {
-    x: receivedObj.x,
-    y: receivedObj.y,
-    z: receivedObj.z
-  }
-
+  console.clear()
   Object.keys(nodePositions).forEach(nodeA => {
     Object.keys(nodePositions).forEach(nodeB => {
       if (nodeA != nodeB) {
         let d = _distanceBetween(nodePositions[nodeA], nodePositions[nodeB]);
+        console.log(`Calculated distance: ${nodeA} \t ${d.toFixed(2)} \t ${nodeB}`);
+        nodeDistances.push({
+          A: nodePositions[nodeA],
+          B: nodePositions[nodeB],
+          distance : d
+        });
 
-        if (!nodeDistances[nodeA])
-          nodeDistances[nodeA] = {};
-
-          nodeDistances[nodeA][nodeB] = d;
       }
     });
-    let message = JSON.stringify(nodeDistances);
-    produceMessage(distance_producer,_distance_topic,message, operatorID);
   });
+  // console.log(nodeDistances)
+  let message = JSON.stringify(nodeDistances);
+  produceMessage(distance_producer,_distance_topic,message, operatorID);
 });
 
 position_consumer.on('disconnected', function (arg) {
@@ -107,6 +110,7 @@ position_consumer.connect();
 
 var distance_producer = new Kafka.Producer({
   'metadata.broker.list': `${process.env.KAFKA_BROKER}:${process.env.KAFKA_BROKER_PORT}`,
+  'queue.buffering.max.kbytes': process.env.KAFKA_QUEUE_BUFFER,
   'dr_cb': true
 });
 

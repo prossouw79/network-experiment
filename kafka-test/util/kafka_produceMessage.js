@@ -1,6 +1,6 @@
-function produceMessage(producer,topic,message, key) {
+function produceMessage(producer,topic,message, key = null, partition = -1) {
     try {
-        console.log('Sending', message)
+        // console.log('Sending', message)
   
         let buffer =  Buffer.from(message);
         // console.log(message,buffer)
@@ -10,7 +10,7 @@ function produceMessage(producer,topic,message, key) {
           topic,
           // optionally we can manually specify a partition for the message
           // this defaults to -1 - which will use librdkafka's default partitioner (consistent random for keyed messages, random for unkeyed messages)
-          null,
+          partition,
           // Message to send. Must be a buffer
           buffer,
           // for keyed messages, we also specify the key - note that this field is optional
@@ -21,7 +21,11 @@ function produceMessage(producer,topic,message, key) {
           // you can send an opaque token here, which gets passed along
           // to your delivery reports
         );
+
+
+
       } catch (err) {
+        producer.flush(10000)
         console.error('A problem occurred when sending our message');
         console.error(err);
       }
