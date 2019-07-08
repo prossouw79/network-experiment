@@ -2,13 +2,22 @@
 
 
 const _ = require('lodash')
-
+const os = require('os')
 const jayson = require('jayson/promise');
 
-// create a client
-const client = jayson.client.http({
-    port: 3000
-});
+let nodes = ['localhost', '127.0.0.1', os.hostname()]
+let port = 3000;
+
+let clients = nodes.map(node => jayson.client.http(`http://${node}:${port++}`));
+
+let clientIndex = 0;
+let roundRobinClient = function () {
+    let nextClient = clients[clientIndex];
+
+    clientIndex = clientIndex == (clients.length - 1) ? 0 : (clientIndex + 1);
+    return nextClient;
+}
+
 
 let mapErrorCode = require('./util/mapErrorCode')
 
@@ -16,12 +25,12 @@ let nodeID = null;
 let localState = null;
 let knownPositions = {};
 let minDistance = 3;
-let maxDistance = 15;
+let maxDistance = 8;
 let maxSpeed = 3;
 
-const tickrate = 100;
+const tickrate = 500;
 
-client.request('guid', [3]).then(resp => {
+roundRobinClient().request('guid', [3]).then(resp => {
     nodeID = resp.result;
     console.log(nodeID)
     localState = {
@@ -39,8 +48,9 @@ client.request('guid', [3]).then(resp => {
 
 //position broadcast with response
 setInterval(() => {
+    console.info('BC_POS')
     if (localState && localState.NodeID) {
-        client.request('positionUpdate', [localState])
+        roundRobinClient().request('positionUpdate', [localState])
             .then(resp => {
                 knownPositions = resp.result;
             }, err => {
@@ -51,7 +61,8 @@ setInterval(() => {
 
 //move random
 setInterval(() => {
-    let randomMoveRequest = client.request('moveRandom', [3, localState]);
+    console.info('MV_RND')
+    let randomMoveRequest = roundRobinClient().request('moveRandom', [3, localState]);
     randomMoveRequest.then(resp => {
         if (resp.error)
             console.error("JSON RPC ERROR:", mapErrorCode(resp.error.code))
@@ -62,15 +73,14 @@ setInterval(() => {
 }, tickrate);
 
 setInterval(() => {
+    console.info('GT_DST')
     if (!localState || !knownPositions || Object.keys(knownPositions).length < 2)
         return;
-
-
     let otherNodes = _.filter(Object.keys(knownPositions), x => x != localState.NodeID);
     let distanceRequests = [];
     otherNodes.forEach(nodeID => {
         if (knownPositions[nodeID] && knownPositions[nodeID].NodeID != localState.NodeID) {
-            distanceRequests.push(client.request('distanceBetween',
+            distanceRequests.push(roundRobinClient().request('distanceBetween',
                 [
                     localState,
                     knownPositions[nodeID]
@@ -89,6 +99,8 @@ setInterval(() => {
 
 
 setInterval(() => {
+    console.info('GT_DST')
+
     if (Object.keys(localState.DistanceTo).length == 0)
         return;
 
@@ -105,8 +117,8 @@ setInterval(() => {
     let farthestNode = nodesByDistance[nodesByDistance.length - 1]
 
     if (closestNode.Distance < minDistance) {
-        console.info(localState.NodeID ,' moving away from ', farthestNode.NodeID)
-        client.request('moveFrom', [localState, knownPositions[closestNode.NodeID], maxSpeed])
+        console.info(localState.NodeID, ' < -- <', farthestNode.NodeID)
+        roundRobinClient().request('moveFrom', [localState, knownPositions[closestNode.NodeID], maxSpeed])
             .then(response => {
                 if (response.result) {
                     localState = response.result;
@@ -116,8 +128,8 @@ setInterval(() => {
             })
     }
     if (farthestNode.Distance > maxDistance) {
-        console.info(localState.NodeID ,' moving closer to ', farthestNode.NodeID)
-        client.request('moveTo', [localState, knownPositions[closestNode.NodeID], maxSpeed])
+        console.info(localState.NodeID, ' > -- > ', farthestNode.NodeID)
+        roundRobinClient().request('moveTo', [localState, knownPositions[farthestNode.NodeID], maxSpeed])
             .then(response => {
                 if (response.result) {
                     localState = response.result;
@@ -133,7 +145,7 @@ setInterval(() => {
 
 
 // //#region guid
-// let guidPromise = client.request('guid', [3]);
+// let guidPromise = roundRobinClient().request('guid', [3]);
 
 // guidPromise.then(resp => {
 //     console.log('guid', resp.result);
@@ -155,7 +167,7 @@ setInterval(() => {
 //     z: 1
 // }
 
-// let distancePromise = client.request('distanceBetween', [testA, testB, 3]);
+// let distancePromise = roundRobinClient().request('distanceBetween', [testA, testB, 3]);
 // distancePromise.then(resp => {
 //     console.log(`Distance between A and B is:`, resp.result);
 // }, err => {
@@ -178,7 +190,7 @@ setInterval(() => {
 
 // let positionUpdateRate = 1000;
 
-// let avgSpeedPromise = client.request('averageSpeed', [updateHistory, positionUpdateRate]);
+// let avgSpeedPromise = roundRobinClient().request('averageSpeed', [updateHistory, positionUpdateRate]);
 // avgSpeedPromise.then(resp => {
 //     console.log(`Average speed is:`, resp.result);
 // }, err => {
@@ -193,7 +205,7 @@ setInterval(() => {
 //     y: 0,
 //     z: 0
 // }
-// let moveRandomPromise = client.request('moveRandom', [maxSpeed, currentPosition]);
+// let moveRandomPromise = roundRobinClient().request('moveRandom', [maxSpeed, currentPosition]);
 
 // moveRandomPromise.then(resp => {
 //     console.log('Position after random move', resp.result);
@@ -208,7 +220,7 @@ setInterval(() => {
 //     y: 5,
 //     z: 5
 // }
-// let moveToPromise = client.request('moveTo', [currentPosition, targetPosition, maxSpeed]);
+// let moveToPromise = roundRobinClient().request('moveTo', [currentPosition, targetPosition, maxSpeed]);
 
 // moveToPromise.then(resp => {
 //     console.log('Position after move to ', targetPosition, ' is ', resp.result);
@@ -218,7 +230,7 @@ setInterval(() => {
 // //#endregion
 
 // //#region moveFrom
-// let moveFromPromise = client.request('moveFrom', [currentPosition, targetPosition, maxSpeed]);
+// let moveFromPromise = roundRobinClient().request('moveFrom', [currentPosition, targetPosition, maxSpeed]);
 
 // moveFromPromise.then(resp => {
 //     console.log('Position after move from ', targetPosition, ' is ', resp.result);
