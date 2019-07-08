@@ -80,78 +80,72 @@ position_consumer.on('data', function (m) {
   // console.log(distancePairs);
 
   let nodesTooClose = distancePairs
+    .filter(x => x.A.NodeID != process.env.KAFKA_AVG_POS_KEY  && x.B.NodeID != process.env.KAFKA_AVG_POS_KEY)
     .filter(x => x.distance < min_threshold);
 
   let nodesTooFar = distancePairs
+    .filter(x => x.A.NodeID != process.env.KAFKA_AVG_POS_KEY  && x.B.NodeID != process.env.KAFKA_AVG_POS_KEY)
     .filter(x => x.distance > max_threshold);
 
-  console.log('Too Close\t', nodesTooClose.map(x => {
-    return {
-      "A": x.A.NodeID,
-      "B": x.B.NodeID
-    }
-  }));
-  console.log('Too Far\t\t', nodesTooFar.map(x => {
-    return {
-      "A": x.A.NodeID,
-      "B": x.B.NodeID
-    }
-  }));
+  let strayingNodes = distancePairs
+    .filter(x => x.B.NodeID == process.env.KAFKA_AVG_POS_KEY && x.distance > max_threshold);
 
-  nodesTooClose.forEach(node => {
-    //A needs to move further from B
-    let messageA = {
-      "Movement": "away",
-      "Target": node.B
-    }
-    //B needs to move further from A
-    let messageB = {
-      "Movement": "away",
-      "Target": node.A
-    }
-
-    produceMessage(movement_producer, `${_movement_topic}_${node.A.NodeID}`, JSON.stringify(messageA));
-    produceMessage(movement_producer, `${_movement_topic}_${node.B.NodeID}`, JSON.stringify(messageB));
-  });
+  let averagePosition = distancePairs
+    .find(x => x.B.NodeID == process.env.KAFKA_AVG_POS_KEY)
+    .B;
 
 
-  nodesTooFar.forEach(node => {
-    //A needs to move further from B
-    let messageA = {
-      "Movement": "towards",
-      "Target": node.B
-    }
-    //B needs to move further from A
-    let messageB = {
-      "Movement": "towards",
-      "Target": node.A
-    }
+  if (strayingNodes.length > 0) {
+    console.log('Stray Nodes\t', strayingNodes.map(x => x.A.NodeID));
+    console.log('Calling all nodes closer to average position.');
 
-    produceMessage(movement_producer, `${_movement_topic}_${node.A.NodeID}`, JSON.stringify(messageA));
-    produceMessage(movement_producer, `${_movement_topic}_${node.B.NodeID}`, JSON.stringify(messageB));
-  });
+    distancePairs.forEach(node => {
+      let message = {
+        "Movement": "towards",
+        "Target": averagePosition
+      }
+      produceMessage(movement_producer, `${_movement_topic}_${node.A.NodeID}`, JSON.stringify(message));
+    });
 
+  } else {
+    if (nodesTooClose.length > 0)
+      console.log('Too Close\t', nodesTooClose.map(x => `${x.A.NodeID} - ${x.B.NodeID}`));
 
+    if (nodesTooFar.length > 0)
+      console.log('Too Far\t\t', nodesTooFar.map(x => `${x.A.NodeID} - ${x.B.NodeID}`));
 
-  // Object.keys(distancePairs)
-  //   .forEach(nodeID => {
-  //     let relativeDistances = distancePairs[nodeID];
+    nodesTooClose.forEach(node => {
+      //A needs to move further from B
+      let messageA = {
+        "Movement": "away",
+        "Target": node.B
+      }
+      //B needs to move further from A
+      let messageB = {
+        "Movement": "away",
+        "Target": node.A
+      }
 
-  //     let nodesTooClose =
-  //       Object.keys(relativeDistances)
-  //         .filter(x => relativeDistances[x] < min_threshold);
+      produceMessage(movement_producer, `${_movement_topic}_${node.A.NodeID}`, JSON.stringify(messageA));
+      produceMessage(movement_producer, `${_movement_topic}_${node.B.NodeID}`, JSON.stringify(messageB));
+    });
 
-  //     let nodesTooFar =
-  //       Object.keys(relativeDistances)
-  //         .filter(x => relativeDistances[x] > max_threshold);
+    nodesTooFar.forEach(node => {
+      //A needs to move further from B
+      let messageA = {
+        "Movement": "towards",
+        "Target": node.B
+      }
+      //B needs to move further from A
+      let messageB = {
+        "Movement": "towards",
+        "Target": node.A
+      }
 
-  //     console.log('Too Close\t', nodeID, nodesTooClose);
-  //     console.log('Too Far\t\t', nodeID, nodesTooFar);
-
-
-
-
-  //   });
+      produceMessage(movement_producer, `${_movement_topic}_${node.A.NodeID}`, JSON.stringify(messageA));
+      produceMessage(movement_producer, `${_movement_topic}_${node.B.NodeID}`, JSON.stringify(messageB));
+    });
+  }
 });
 
 position_consumer.on('disconnected', function (arg) {

@@ -80,15 +80,16 @@ movement_consumer.on('data', function (m) {
   let receivedObj = JSON.parse(m.value.toString());
   // console.log(receivedObj);
   if ((new Date().getTime() - lastMovement) > 500) {
+    console.clear();
     if (receivedObj.Movement == 'away') {
-      console.log('moving from ', receivedObj.Target.NodeID);
+      console.log('<=\t', receivedObj.Target.NodeID);
       console.log(currentPosition);
       currentPosition = _moveFrom(currentPosition, receivedObj.Target, moveSpeed);
       lastMovement = new Date().getTime();
     }
 
     if (receivedObj.Movement == 'towards') {
-      console.log('moving towards ', receivedObj.Target.NodeID);
+      console.log('=>\t', receivedObj.Target.NodeID);
       console.log(currentPosition);
       currentPosition = _moveTo(currentPosition, receivedObj.Target, moveSpeed);
       lastMovement = new Date().getTime();
@@ -127,7 +128,7 @@ position_producer.on('ready', function () {
     } else {
       produceMessage(position_producer, _position_topic, JSON.stringify(currentPosition), operatorID);
     }
-  }, 50);
+  }, 250);
 });
 
 position_producer.on('delivery-report', function (err, report) {

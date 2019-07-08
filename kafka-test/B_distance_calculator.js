@@ -1,11 +1,14 @@
 const Kafka = require('node-rdkafka');
 const dotenv = require('dotenv');
 const asTable = require('as-table')
+require('lodash.combinations');
+const _ = require('lodash');
 
 //functions 
 const getRandomInt = require('./util/randomInt');
 let _guid = require('./util/guid.js');
 let _distanceBetween = require('./util/distance.js');
+let _averagePosition = require('./util/averagePosition.js')
 let produceMessage = require('./util/kafka_produceMessage.js');
 
 let nodePositions = {}
@@ -74,26 +77,33 @@ position_consumer.on('data', function (m) {
   let receivedObj = JSON.parse(m.value.toString());
   // console.log(receivedObj);
   nodePositions[receivedObj.NodeID] = receivedObj;
-  nodeDistances = [];  
+  nodeDistances = [];
+
+  _averagePosition(nodePositions, process.env.KAFKA_AVG_POS_KEY)
 
   console.clear()
-  Object.keys(nodePositions).forEach(nodeA => {
-    Object.keys(nodePositions).forEach(nodeB => {
-      if (nodeA != nodeB) {
-        let d = _distanceBetween(nodePositions[nodeA], nodePositions[nodeB]);
-        console.log(`Calculated distance: ${nodeA} \t ${d.toFixed(2)} \t ${nodeB}`);
-        nodeDistances.push({
-          A: nodePositions[nodeA],
-          B: nodePositions[nodeB],
-          distance : d
-        });
+  console.log('Average Position', nodePositions[process.env.KAFKA_AVG_POS_KEY])
 
-      }
+  let nodeCombinations = _.combinations(Object.keys(nodePositions), 2);
+
+  _.orderBy(nodeCombinations, x => x[0])
+    .forEach(pair => {
+      let nodeA = nodePositions[pair[0]];
+      let nodeB = nodePositions[pair[1]];
+
+      let d = _distanceBetween(nodeA, nodeB);
+      console.log(`Calculated distance: ${nodeA.NodeID}\t${nodeB.NodeID}: ${d.toFixed(2)}`);
+
+      nodeDistances.push({
+        A: nodeA,
+        B: nodeB,
+        distance: d
+      });
     });
-  });
+
   // console.log(nodeDistances)
   let message = JSON.stringify(nodeDistances);
-  produceMessage(distance_producer,_distance_topic,message, operatorID);
+  produceMessage(distance_producer, _distance_topic, message, operatorID);
 });
 
 position_consumer.on('disconnected', function (arg) {
@@ -119,11 +129,11 @@ var distance_producer = new Kafka.Producer({
 distance_producer.connect();
 
 // Wait for the ready event before proceeding
-distance_producer.on('ready', function() {
+distance_producer.on('ready', function () {
   console.log('Producer ready')
 });
 
-distance_producer.on('delivery-report', function(err, report) {
+distance_producer.on('delivery-report', function (err, report) {
   // Report of delivery statistics here:
   //
   console.log(report);
@@ -132,7 +142,7 @@ distance_producer.on('delivery-report', function(err, report) {
 
 
 // Any errors we encounter, including connection errors
-distance_producer.on('event.error', function(err) {
+distance_producer.on('event.error', function (err) {
   console.error('Error from producer');
   console.error(err);
 })
