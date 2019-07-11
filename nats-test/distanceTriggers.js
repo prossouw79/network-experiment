@@ -1,11 +1,24 @@
-let nats = require('./nats-conf')
 let util = require('./util')
 let _ = require('lodash');
 
-const threshold_min_distance = 2;
-const threshold_max_distance = 10;
+let getNats = require('./randomNats.js');
+let nats = getNats();
+printState = {};
 
-nats.subscribe('distanceUpdates', event => {
+setInterval(() => {
+    nats = getNats();
+    printState.Server = nats.currentServer.url.host;
+    console.info(`Connecting to:`, printState.Server);
+}, 3000);
+
+setInterval(() => {
+    util.printCurrentState(printState);
+}, 250);
+
+const threshold_min_distance = parseInt(util.getEnvironmentVariable('DISTANCE_MIN'));
+const threshold_max_distance = parseInt(util.getEnvironmentVariable('DISTANCE_MAX'));
+
+nats.subscribe(util.getEnvironmentVariable('TOPIC_DISTANCE'), event => {
     let e = JSON.parse(event);
 
     let collisionRisks = _.filter(e, x => x.distance < threshold_min_distance);
@@ -19,8 +32,8 @@ nats.subscribe('distanceUpdates', event => {
             target: riskPair.to_pos
         }
 
-        console.log(`Trigger ${riskPair.from_id}: PROX WARNING`);
-        nats.publish('collision-avoidance-warning', JSON.stringify(warning))
+        printState.Detected =`${riskPair.from_id}: PROX WARNING`;
+        nats.publish(util.getEnvironmentVariable('TOPIC_COLLISION_WARNING'), JSON.stringify(warning))
     });
 
     signalLossRisks.forEach(riskPair => {
@@ -31,8 +44,8 @@ nats.subscribe('distanceUpdates', event => {
             target: riskPair.to_pos
         }
 
-        console.log(`Trigger ${riskPair.from_id}: DIST WARNING`);
-        nats.publish('signal-loss-warning', JSON.stringify(warning))
+        printState.Detected =`${riskPair.from_id}: DIST WARNING`;
+        nats.publish(util.getEnvironmentVariable('TOPIC_SIGNAL_WARNING'), JSON.stringify(warning))
     });
 
 })

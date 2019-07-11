@@ -1,9 +1,22 @@
-let nats = require('./nats-conf')
 let util = require('./util')
 const uuidv4 = require('uuid/v4');
-const speed = 1;
-const moveInterval = 500;
-const producerID = uuidv4()
+const speed = parseInt(util.getEnvironmentVariable('MOVEMENT_SPEED'));
+const moveInterval = parseInt(util.getEnvironmentVariable('UPDATE_RATE_MS'));
+const producerID = util.guid()
+
+let getNats = require('./randomNats.js');
+let nats = getNats();
+printState = {};
+
+setInterval(() => {
+    nats = getNats();
+    printState.Server = nats.currentServer.url.host;
+    console.info(`Connecting to:`, printState.Server);
+}, 500);
+
+setInterval(() => {
+    util.printCurrentState(printState);
+}, 250);
 
 let randBetween = util.randBetween;
 let moveTo = util.moveTo;
@@ -25,29 +38,37 @@ state = {
 
 //initial publish
 setInterval(() => {
+    if (!nats)
+        return;
+
     let timeSinceLastMove = new Date().getTime() - lastMove;
     if (timeSinceLastMove > moveInterval) {
         if (moveRandom) {
-            console.log('Within bounds, moving randomly')
+            printState.Movement = 'Within bounds, moving randomly';
+
+            printState.Movement = 'Random';
+            printState.Target = 'None';
+            printState.CurrentPosition = `${state.x}, ${state.y},${state.z}`;
+
             randomPosition(speed)
             let message = JSON.stringify(state);
-            nats.publish('positionUpdates', message);
+            nats.publish(util.getEnvironmentVariable('TOPIC_POSITION'), message);
             lastMove = new Date().getTime();
             moveRandom = true;
         } else {
             if (latestActionedWarning.x != latestReceivedWarning.x ||
                 latestActionedWarning.y != latestReceivedWarning.y ||
                 latestActionedWarning.z != latestReceivedWarning.z) {
-                console.log('Responding to warning', latestReceivedWarning)
+                printState.Movement = 'Responding to warning' + latestReceivedWarning;
                 let message = JSON.stringify(state);
-                nats.publish('positionUpdates', message);
+                nats.publish(util.getEnvironmentVariable('TOPIC_POSITION'), message);
                 lastMove = new Date().getTime();
                 latestActionedWarning = latestReceivedWarning;
             }
         }
         moveRandom = true;
     }
-}, 100);
+}, moveInterval / 2);
 
 function randomPosition(maxDif) {
     maxDif = Math.abs(maxDif);
@@ -56,23 +77,29 @@ function randomPosition(maxDif) {
     state.z += randBetween(-1 * maxDif, maxDif);
 }
 
-nats.subscribe('collision-avoidance-warning', event => {
+nats.subscribe(util.getEnvironmentVariable('TOPIC_COLLISION_WARNING'), event => {
     let e = JSON.parse(event);
     if (e.from == producerID) {
         latestReceivedWarning = e;
 
-        console.log('Moving away from ', e.target, ` from ${state.x}, ${state.y},${state.z}`);
+        printState.Movement = `Moving further`;
+        printState.Target = e.target;
+        printState.CurrentPosition = `${state.x}, ${state.y},${state.z}`;
+
         moveFrom(state, e.target, speed)
         moveRandom = false;
     }
 })
 
-nats.subscribe('signal-loss-warning', event => {
+nats.subscribe(util.getEnvironmentVariable('TOPIC_SIGNAL_WARNING'), event => {
     let e = JSON.parse(event);
     if (e.from == producerID) {
         latestReceivedWarning = e;
 
-        console.log('Moving closer to ', e.target, ` from ${state.x}, ${state.y},${state.z}`);
+        printState.Movement = `Moving closer`;
+        printState.Target = e.target;
+        printState.CurrentPosition = `${state.x}, ${state.y},${state.z}`;
+
         moveTo(state, e.target, speed)
         moveRandom = false;
     }

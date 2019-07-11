@@ -1,6 +1,16 @@
+require('dotenv').config()
+
+function getEnvironmentVariable(key){
+    return process.env[key];
+}
+
+function printCurrentState(printState) {
+    console.clear();
+    console.log(printState)
+}
+
 function randBetween(minimum, maximum) {
     let rnd = Math.floor(Math.random() * (maximum - minimum + 1)) + minimum;
-    // console.info(rnd)
     return rnd
 }
 
@@ -60,9 +70,28 @@ function moveFrom(origin, target, maxDistance = 2) {
     }
 }
 
+function guid(parts = 1) {
+    function s4() {
+        return Math.floor((1 + Math.random()) * 0x10000)
+            .toString(16)
+            .substring(1);
+    }
+    let guid = "";
+    for (let c = 0; c < parts; c++) {
+        guid += s4() + "-";
+    }
+
+    guid = guid.substring(0, guid.length - 1);
+
+    return guid;
+}
+
 module.exports = {
     randBetween: randBetween,
     distanceBetween: distanceBetween,
     moveFrom: moveFrom,
-    moveTo: moveTo
+    moveTo: moveTo,
+    printCurrentState: printCurrentState,
+    getEnvironmentVariable: getEnvironmentVariable,
+    guid: guid
 }
