@@ -5,12 +5,10 @@ function getDefaultSTAN(prefix){
     .connect(getEnvironmentVariable('CLUSTER_ID'),
      `${prefix}-${guid()}`,
      {
-         ackTimeout: 500,
-         connectTimeout: 1500,
-         pingInterval: 2000,
          maxReconnectAttempts: 3,
          verbose: true,
-         servers: "nats://localhost:4222",
+         url: `nats://${getEnvironmentVariable('NATS_SERVER')}:4222`,
+        //  servers: `nats://${getEnvironmentVariable('NATS_STREAMING_SERVER')}:4222`,
          reconnect: true,
      });
 }

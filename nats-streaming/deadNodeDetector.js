@@ -3,8 +3,7 @@
 
 let util = require('./util')
 const operatorID = util.guid();
-var stan = require('node-nats-streaming')
-    .connect(util.getEnvironmentVariable('CLUSTER_ID'), `deadNodeDetector-${operatorID}`);
+var stan = util.getDefaultSTAN('deadNodeDetector');
 
 let _ = require('lodash');
 let lastMessageTimes = {};

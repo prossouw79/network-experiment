@@ -3,8 +3,7 @@
 
 let util = require('./util')
 const operatorID = util.guid();
-var stan = require('node-nats-streaming')
-    .connect(util.getEnvironmentVariable('CLUSTER_ID'), `distanceCalculator-${operatorID}`);
+var stan = util.getDefaultSTAN('distanceCalculator');
 
 let _ = require('lodash')
 asTable = require('as-table')

@@ -2,8 +2,7 @@
 "use-strict";
 let util = require('./util')
 const operatorID = util.guid();
-var stan = require('node-nats-streaming')
-    .connect(util.getEnvironmentVariable('CLUSTER_ID'), `distanceTrigger-${operatorID}`);
+var stan = util.getDefaultSTAN('distanceTrigger');
 
 let _ = require('lodash')
 let printState = {};
