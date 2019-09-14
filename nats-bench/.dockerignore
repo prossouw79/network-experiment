@@ -3,4 +3,4 @@ bench
 package-lock.json
 .vscode
 Dockerfile
-*.md
+run.sh

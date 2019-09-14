@@ -23,10 +23,13 @@ RUN apt-get install -y --no-install-recommends \
 RUN curl -sL https://deb.nodesource.com/setup_10.x | bash -
 RUN apt-get install nodejs -y
 
-COPY . .
-
+COPY package.json .
 RUN npm install
 
 RUN go get github.com/nats-io/nats.go/
 RUN go get github.com/nats-io/nats.go/bench
+
+COPY bench.go .
 RUN go build bench.go
+
+COPY . .
