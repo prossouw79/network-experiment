@@ -5,18 +5,11 @@ const _ = require('lodash')
 
 reps = 3;
 // servers = ["192.168.10.21", "192.168.10.22", "192.168.10.23",];
-servers = ["10.0.0.11", "10.0.0.12", "10.0.0.13",];
-subs = [1, 2, 3]
-pubs = [1, 2, 3]
+servers = ["nats-cluster-node-1", "nats-cluster-node-2", "nats-cluster-node-3"];
+clients = 3;
+
 msgs = [1000, 10000]
 sizes = [128, 256, 512]
-
-// reps = 2;
-// servers = ["10.0.0.11"];
-// subs = [1]
-// pubs = [1]
-// msgs = [1]
-// sizes = [1]
 
 topic = "foo";
 
@@ -37,24 +30,20 @@ if (tests.length == 0) {
     msgs.forEach(n => {
         sizes.forEach(ms => {
             servers.forEach(s => {
-                subs.forEach(ns => {
-                    pubs.forEach(np => {
-                        for (let i = 0; i < reps; i++) {
-                            tests.push({
-                                Complete: false,
-                                Key: '',
-                                Input: {
-                                    Server: s,
-                                    Subscribers: ns,
-                                    Publishers: np,
-                                    Messages: n,
-                                    MessageSize: ms,
-                                },
-                                Output: []
-                            })
-                        }
-                    });
-                });
+                for (let i = 0; i < reps; i++) {
+                    tests.push({
+                        Complete: false,
+                        Key: '',
+                        Input: {
+                            Server: s,
+                            Subscribers: clients,
+                            Publishers: clients,
+                            Messages: n,
+                            MessageSize: ms,
+                        },
+                        Output: []
+                    })
+                }
             });
         });
     });
@@ -65,8 +54,8 @@ tests.forEach(t => {
         try {
             console.log(`Running ${tests.indexOf(t) + 1}/${tests.length}`)
             let s = t.Input.Server;
-            let ns = t.Input.Subscribers;
-            let np = t.Input.Publishers;
+            let ns = clients;
+            let np = clients;
             let n = t.Input.Messages;
             let ms = t.Input.MessageSize;
 
