@@ -12,12 +12,6 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
 RUN apt-get update
 
 RUN apt-get install -y --no-install-recommends \
-    apt-transport-https \
-    build-essential \
-    ca-certificates \
-    curl \
-    git \
-    libssl-dev \
     wget \
     curl && \
     rm -rf /var/lib/apt/lists/*
