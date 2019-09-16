@@ -34,3 +34,5 @@ node-peer-discovery-tool/machinefile\.openmpi
 nats-bench/csv/
 
 nats-bench/bench
+
+nats-bench/tests.json

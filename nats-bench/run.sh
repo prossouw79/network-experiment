@@ -15,7 +15,7 @@ docker network rm $NETWORK
 docker network create --driver overlay --attachable $NETWORK
 
 for i in `seq 1 3`; do
-docker service create --publish 4222 \
+docker service create --publish $i4222:4222 \
                       --network $NETWORK \
                       --name nats-cluster-node-$i nats:1.1.0 \
                       -cluster nats://0.0.0.0:6222 \
@@ -23,7 +23,7 @@ docker service create --publish 4222 \
 done
 
 for i in `seq 1 3`; do
-docker service create --publish 6222 \
+docker service create --publish 6222:6222 \
                       --network $NETWORK \
                       --name nats-streaming-node-$i nats-streaming:0.9.2 \
                       -store file -dir store -clustered -cluster_id swarm -cluster_node_id node-$i \
