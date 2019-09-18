@@ -32,4 +32,6 @@ RUN go get github.com/nats-io/nats.go/bench
 COPY bench.go .
 RUN go build bench.go
 
+RUN mkdir results
+
 COPY . .

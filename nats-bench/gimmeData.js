@@ -1,181 +1,152 @@
-const shell = require('shelljs');
-const fs = require('fs');
-const dateFormat = require('dateformat');
-const _ = require('lodash')
-const ObjectsToCsv = require('objects-to-csv');
+const shell = require("shelljs");
+const fs = require("fs");
+const dateFormat = require("dateformat");
+const _ = require("lodash");
+const ObjectsToCsv = require("objects-to-csv");
 
-reps = 5;
+let testDate = new Date();
+let results_folder = `results/${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}`;
+shell.exec(`mkdir -p ${results_folder}`);
+let fn = `${results_folder}/tests.json`;
+
+reps = 3;
 servers = ["10.0.0.11", "10.0.0.12", "10.0.0.13"];
 // servers = ["nats-cluster-node-1", "nats-cluster-node-2", "nats-cluster-node-3"];
-pubs = [1, 2, 3];
-subs = [0, 1, 2, 3];
-msgs = [500]
-sizes = [1, 2, 4, 8, 16, 32, 64, 128]
+pubs = [1, 2];
+subs = [0, 1, 2];
+msgs = 1000;
+sizes = [1, 2, 4, 8, 16, 32, 64, 128];
+
+// test params
+// reps = 2;
+// servers = ["10.0.0.11", "10.0.0.12"];
+// // servers = ["nats-cluster-node-1", "nats-cluster-node-2", "nats-cluster-node-3"];
+// pubs = [1, 2];
+// subs = [0, 1];
+// msgs = 10;
+// sizes = [1, 2];
 
 topic = "foo";
 
-shell.exec(`rm -rf csv/ && mkdir csv`)
+shell.exec(`rm -rf csv/ && mkdir csv`);
 
 let tests = [];
-let testDate = new Date();
-let fn = `tests.json`;
-
-
-function msConversion(millis) {
-    let sec = Math.floor(millis / 1000);
-    let hrs = Math.floor(sec / 3600);
-    sec -= hrs * 3600;
-    let min = Math.floor(sec / 60);
-    sec -= min * 60;
-  
-    sec = '' + sec;
-    sec = ('00' + sec).substring(sec.length);
-  
-    if (hrs > 0) {
-      min = '' + min;
-      min = ('00' + min).substring(min.length);
-      return hrs + ":" + min + ":" + sec;
-    }
-    else {
-      return min + ":" + sec;
-    }
-  }
 
 if (fs.existsSync(fn)) {
-    existingTests = JSON.parse(fs.readFileSync(fn, "utf8"));
-    let incompleteTests = existingTests.tests.filter(x => x.Complete == false);
-    if (incompleteTests.length > 0)
-        tests = existingTests.tests;
+  existingTests = JSON.parse(fs.readFileSync(fn, "utf8"));
+  let incompleteTests = existingTests.tests.filter(x => x.Complete == false);
+  if (incompleteTests.length > 0) tests = existingTests.tests;
 }
 
 if (tests.length == 0) {
-    msgs.forEach(n => {
-        sizes.forEach(ms => {
-            servers.forEach(s => {
-                pubs.forEach(np => {
-                    subs.forEach(ns => {
-                        for (let i = 0; i < reps; i++) {
-                            tests.push({
-                                Complete: false,
-                                Key: '',
-                                Input: {
-                                    Server: s,
-                                    Subscribers: ns,
-                                    Publishers: np,
-                                    Messages: n,
-                                    MessageSize: ms,
-                                },
-                                Output: []
-                            })
-                        }
-                    });
-                });
+  sizes.forEach(ms => {
+    servers.forEach(s => {
+      pubs.forEach(np => {
+        subs.forEach(ns => {
+          for (let i = 0; i < reps; i++) {
+            tests.push({
+              Complete: false,
+              Repetition: (i+1),
+              Server: s,
+              Subscribers: ns,
+              Publishers: np,
+              MessageSize: ms,
+              Messages: msgs,
+              PublisherAverageMsgsPerSec: 0,
+              SubscriberAverageMsgsPerSec: 0,
+              PublisherAverageBytesPerSec: 0,
+              SubscriberAverageBytesPerSec: 0
             });
+          }
         });
+      });
     });
+  });
 }
 
-let totalDataToSend = _.sumBy(tests, t => {
-    return t.Complete ? 0 : t.Input.Messages * t.Input.MessageSize;
-})
-let dataSent = 0;
-
-let startTime = new Date();
-
-tests = _.sortBy(tests, i => {
-    return -1 * i.Input.Messages * i.Input.MessageSize
-})
-
 tests.forEach(t => {
-    if (!t.Complete) {
-        try {
-            let elapsedTime = (new Date().getTime() - startTime.getTime());
-            let percentageDone = (dataSent * 100 / totalDataToSend).toFixed(2);
-            let totalEstimatedTime = (elapsedTime * totalDataToSend / dataSent);
-            let remainingTime = (totalEstimatedTime - elapsedTime);
+  if (!t.Complete) {
+    try {
+      console.clear();
+      console.log(`Running ${tests.indexOf(t) + 1}/${tests.length}`);
 
-            // console.log(`Running ${tests.indexOf(t) + 1}/${tests.length}`);
-            console.clear();
-            console.log(`Sent ${dataSent.toFixed(0)/1000} / ${totalDataToSend / 1000} bytes:\t${percentageDone}% \nEst. time remaining:\t${msConversion(remainingTime)}`);
-            console.log()
-            let s = t.Input.Server;
-            let ns = t.Input.Subscribers;
-            let np = t.Input.Publishers;
-            let n = t.Input.Messages;
-            let ms = t.Input.MessageSize;
+      let filename = `csv/REP_${t.Server}_${t.Key}.csv`;
+      const { stdout, stderr, code } = shell.exec(
+        `./bench -s ${t.Server} -ns ${t.Subscribers} -np ${t.Publishers} -n ${t.Messages} -ms ${t.MessageSize} -csv ${filename} ${topic}`,
+        { silent: false }
+      );
 
-            t.Key = `${ns}_${np}_${n}_${ms}`;
+      let csvStr = fs.readFileSync(filename, "utf8");
+      //example
+      // 0                        1         2         3         4           5              6  
+      // #RunID,                  ClientID, MsgCount, MsgBytes, MsgsPerSec, BytesPerSec,   DurationSecs
+      // hojfy5lmijWfvGV7lsw8dK,  S0,       1000,     4000,     13981,      55926.401192,  0.071523
+      // hojfy5lmijWfvGV7lsw8dK,  S1,       1000,     4000,     13495,      53980.487403,  0.074101
+      // hojfy5lmijWfvGV7lsw8dK,  S2,       1000,     4000,     13530,      54120.800360,  0.073909
+      // hojfy5lmijWfvGV7lsw8dK,  P0,       334,      1336,     13332,      53331.564131,  0.025051
+      // hojfy5lmijWfvGV7lsw8dK,  P1,       333,      1332,     23300,      93201.137922,  0.014292
+      // hojfy5lmijWfvGV7lsw8dK,  P2,       333,      1332,     21431,      85727.299273,  0.015538
 
-            let filename = `csv/REP_${s}_${t.Key}.csv`
-            // console.log(`./bench -s ${s} -ns ${ns} -np ${np} -n ${n} -ms ${ms} -csv ${filename} ${topic}`)
-            const { stdout, stderr, code } = shell.exec(`./bench -s ${s} -ns ${ns} -np ${np} -n ${n} -ms ${ms} -csv ${filename} ${topic}`, {silent:true})
+      let lines = csvStr
+        .split(/\r?\n/)
+        .filter(l => l.length > 0)
+        .filter(l => !l.startsWith("#"));
 
-            let csvStr = fs.readFileSync(filename, "utf8");
-            let lines = csvStr.split(/\r?\n/)
-                .filter(l => l.length > 0)
-                .filter(l => !l.startsWith('#'))
+      let subResults = lines.filter(x => x.split(",")[1].startsWith("S"));
+      let pubResults = lines.filter(x => x.split(",")[1].startsWith("P"));
 
-            lines.forEach(l => {
-                let parts = l.split(',');
-                t.Output.push({
-                    MsgBytes: parseInt(parts[3]),
-                    MsgsPerSec: parseInt(parts[4]),
-                    BytesPerSec: parseFloat(parts[5]),
-                    DurationSecs: parseFloat(parts[6])
-                });
-            });
+      t.PublisherAverageMsgsPerSec = _.meanBy(pubResults, x => parseInt(x.split(',')[4]) )
+      t.SubscriberAverageMsgsPerSec = _.meanBy(subResults, x => parseInt(x.split(',')[4]) )
+      t.PublisherAverageBytesPerSec = _.meanBy(pubResults, x => parseFloat(x.split(',')[5]) )
+      t.SubscriberAverageBytesPerSec = _.meanBy(subResults, x => parseFloat(x.split(',')[5]) )
 
-            t.Complete = true;
-            dataSent += (t.Input.MessageSize * t.Input.Messages);
-            fs.writeFileSync(fn, JSON.stringify({ tests }));
-        } catch (error) {
-            console.error(error)
-        }
-    } else {
-        console.info("Skipping complete test");
+      t.Complete = true;
+      fs.writeFileSync(fn, JSON.stringify({ tests }));
+    } catch (error) {
+      console.error(error);
     }
+  } else {
+    console.info("Skipping complete test");
+  }
 });
 
-fs.writeFileSync(`results_${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}.json`, JSON.stringify({ tests }));
+fs.writeFileSync(
+  `${results_folder}/${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}.json`,
+  JSON.stringify({ tests })
+);
 
-let stats = []
+new ObjectsToCsv(tests).toDisk(
+  `${results_folder}/${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}.csv`
+);
 
-let groupedByServer = _.groupBy(tests, t => {
-    return t.Input.Server;
-})
+// //flatten results
+// let flatResults = [];
+//   sizes.forEach(ms => {
+//     servers.forEach(s => {
+//       pubs.forEach(np => {
+//         subs.forEach(ns => {
+//           let filteredResults = _.filter(tests, t => )
+//         });
+//       });
+//     });
+//   });
 
-console.log(groupedByServer)
+// sizes.forEach(ms => {
+//   pubs.forEach(np => {
+//     subs.forEach(ns => {
+//       let arr = [];
+//       let filename = `${results_folder}/${ms}-${np}-${ns}.csv`;
+//       let groupedResult = _.filter(tests, function(t) {
+//         return (
+//           t.Output.Subs == ns && t.Output.Pubs == np && t.Output.MsgBytes == ms
+//         );
+//       });
+//       Object.keys(groupedResult).forEach(k => {
+//         arr.push(groupedResult[k]);
+//       });
 
-Object.keys(groupedByServer).forEach(server => {
-    let serverTests = groupedByServer[server];
-
-    let groupedByInputKey = _.groupBy(serverTests, x => x.Key)
-    console.log(groupedByInputKey)
-
-    Object.keys(groupedByInputKey).forEach(groupKey => {
-        let group = groupedByInputKey[groupKey]
-        console.log(group);
-
-        stats.push(
-            {
-                Server: group[0].Input.Server,
-                MessageSize: group[0].Input.MessageSize,
-                Messages: group[0].Input.Messages,
-                AverageBytesPerSec: _.meanBy(group, function (t) {
-                    return _.meanBy(t.Output, result => {
-                        return result.BytesPerSec;
-                    })
-                }),
-                AverageMsgsPerSec: _.meanBy(group, function (t) {
-                    return _.meanBy(t.Output, result => {
-                        return result.MsgsPerSec;
-                    })
-                }),
-            }
-        )
-    });
-});
-console.log(stats)
-new ObjectsToCsv(stats).toDisk(`results_${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}.csv`);
-
-fs.writeFileSync(`results_${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}_grouped.json`, JSON.stringify({ stats }));
+//       shell.exec(`touch ${filename}`);
+//       new ObjectsToCsv(_.sortBy(arr, l => l.Client)).toDisk(filename);
+//     });
+//   });
+// });
