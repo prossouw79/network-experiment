@@ -11,20 +11,43 @@ let fn = `${results_folder}/tests.json`;
 
 reps = 3;
 servers = ["10.0.0.11", "10.0.0.12", "10.0.0.13"];
+// servers = ["192.168.10.21","192.168.10.22","192.168.10.23"];
 // servers = ["nats-cluster-node-1", "nats-cluster-node-2", "nats-cluster-node-3"];
 pubs = [1, 2];
 subs = [0, 1, 2];
-msgs = 1000;
-sizes = [1, 2, 4, 8, 16, 32, 64, 128];
 
-// test params
-// reps = 2;
-// servers = ["10.0.0.11", "10.0.0.12"];
-// // servers = ["nats-cluster-node-1", "nats-cluster-node-2", "nats-cluster-node-3"];
-// pubs = [1, 2];
-// subs = [0, 1];
-// msgs = 10;
-// sizes = [1, 2];
+const expMin = 0;
+const expMax = 12;
+const base = 250; //messages sent of the largest size
+
+sizes = [];
+for (let exp = expMax; exp >= expMin ; exp--) {
+  sizes.push(Math.pow(2,exp));  
+}
+let testSize = sizes[0] * base;
+msgs = sizes.map(x => testSize/x);
+
+console.log('Input Vector:',sizes,msgs)
+
+
+function msConversion(millis) {
+  let sec = Math.floor(millis / 1000);
+  let hrs = Math.floor(sec / 3600);
+  sec -= hrs * 3600;
+  let min = Math.floor(sec / 60);
+  sec -= min * 60;
+
+  sec = "" + sec;
+  sec = ("00" + sec).substring(sec.length);
+
+  if (hrs > 0) {
+    min = "" + min;
+    min = ("00" + min).substring(min.length);
+    return hrs + ":" + min + ":" + sec;
+  } else {
+    return min + ":" + sec;
+  }
+}
 
 topic = "foo";
 
@@ -51,7 +74,7 @@ if (tests.length == 0) {
               Subscribers: ns,
               Publishers: np,
               MessageSize: ms,
-              Messages: msgs,
+              Messages: msgs[sizes.indexOf(ms)],
               PublisherAverageMsgsPerSec: 0,
               SubscriberAverageMsgsPerSec: 0,
               PublisherAverageBytesPerSec: 0,
@@ -64,16 +87,31 @@ if (tests.length == 0) {
   });
 }
 
+let totalDataToSend = _.sumBy(tests, t => {
+  return t.Complete ? 0 : t.Messages * t.MessageSize;
+});
+let dataSent = 0;
+
+let startTime = new Date();
 tests.forEach(t => {
   if (!t.Complete) {
     try {
-      console.clear();
-      console.log(`Running ${tests.indexOf(t) + 1}/${tests.length}`);
+      let elapsedTime = new Date().getTime() - startTime.getTime();
+      let percentageDone = ((dataSent * 100) / totalDataToSend).toFixed(2);
+      let totalEstimatedTime = (elapsedTime * totalDataToSend) / dataSent;
+      let remainingTime = totalEstimatedTime - elapsedTime;
 
-      let filename = `csv/REP_${t.Server}_${t.Key}.csv`;
+      console.log(
+        `Sent ${dataSent.toFixed(0) / 1000} / ${totalDataToSend /
+          1000} bytes:\t${percentageDone}% \nEst. time remaining:\t${msConversion(
+          remainingTime
+        )}`
+      );
+
+      let filename = `csv/REP_${t.Server}_${t.Subscribers}_${t.Publishers}_${t.Messages}_${t.MessageSize}.csv`;
       const { stdout, stderr, code } = shell.exec(
         `./bench -s ${t.Server} -ns ${t.Subscribers} -np ${t.Publishers} -n ${t.Messages} -ms ${t.MessageSize} -csv ${filename} ${topic}`,
-        { silent: false }
+        { silent: true }
       );
 
       let csvStr = fs.readFileSync(filename, "utf8");
@@ -101,7 +139,9 @@ tests.forEach(t => {
       t.SubscriberAverageBytesPerSec = _.meanBy(subResults, x => parseFloat(x.split(',')[5]) )
 
       t.Complete = true;
+      dataSent += t.MessageSize * t.Messages;
       fs.writeFileSync(fn, JSON.stringify({ tests }));
+      console.clear();
     } catch (error) {
       console.error(error);
     }
