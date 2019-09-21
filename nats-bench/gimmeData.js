@@ -7,18 +7,19 @@ const ObjectsToCsv = require("objects-to-csv");
 let testDate = new Date();
 let results_folder = `results/${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}`;
 shell.exec(`mkdir -p ${results_folder}`);
-let fn = `${results_folder}/tests.json`;
+let fn = `results/current_tests.json`;
 
 reps = 3;
-servers = ["10.0.0.11", "10.0.0.12", "10.0.0.13"];
-// servers = ["192.168.10.21","192.168.10.22","192.168.10.23"];
-// servers = ["nats-cluster-node-1", "nats-cluster-node-2", "nats-cluster-node-3"];
+servers = ["localhost", "127.0.0.1", "GL553VD"];                                      //local-script-mode
+// servers = ["10.0.0.11", "10.0.0.12", "10.0.0.13"];                                 //mesh-node
+// servers = ["192.168.10.21","192.168.10.22","192.168.10.23"];                       //eth-node
+// servers = ["nats-cluster-node-1", "nats-cluster-node-2", "nats-cluster-node-3"];   //swarm-container
 pubs = [1, 2];
 subs = [0, 1, 2];
 
 const expMin = 0;
-const expMax = 12;
-const base = 250; //messages sent of the largest size
+const expMax = 10;
+const base = 100; //messages sent of the largest size
 
 sizes = [];
 for (let exp = expMax; exp >= expMin ; exp--) {
