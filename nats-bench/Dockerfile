@@ -17,6 +17,7 @@ RUN apt-get install -y --no-install-recommends \
         software-properties-common \
         curl \
         git \
+        nano \
         libssl-dev \
         wget
 
