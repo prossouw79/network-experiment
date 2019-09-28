@@ -11,7 +11,7 @@ shell.exec(`mkdir -p ${results_folder}`);
 let fn = `results/current_tests.json`;
 
 reps = 3;
-// servers = ["localhost", "127.0.0.1", os.hostname()];                                      //local-script-mode
+// servers = ["localhost", "127.0.0.1", os.hostname()];                                  //local-script-mode
 servers = ["10.0.0.11", "10.0.0.12", "10.0.0.13"];                                 //mesh-node
 // servers = ["192.168.10.21","192.168.10.22","192.168.10.23"];                       //eth-node
 // servers = ["nats-cluster-node-1", "nats-cluster-node-2", "nats-cluster-node-3"];   //swarm-container
@@ -19,7 +19,7 @@ pubs = [1, 2];
 subs = [0, 1, 2];
 
 const expMin = 0;
-const expMax = 12;
+const expMax = 12; //e.g. 10 => 1024
 const base = 100; //messages sent of the largest size
 
 sizes = [];
@@ -167,30 +167,48 @@ tests.forEach(t => {
   }
 });
 
-tests = tests.map(function(t){
+let groupedResults = tests.map(function(t){
   let comparableTests = tests.filter(test => {
     return test.Subscribers == t.Subscribers &&
            test.Publishers == t.Publishers &&
            test.MessageSize == t.MessageSize
   });
-  t.GroupedMeanPublisherMessageRate = mean(comparableTests.map(x => x.PublisherAverageMsgsPerSec));
-  t.GroupedMeanSubscriberMessageRate = mean(comparableTests.map(x => x.SubscriberAverageMsgsPerSec));
-  t.GroupedMeanPublisherBytesPerSec = mean(comparableTests.map(x => x.PublisherAverageBytesPerSec));
-  t.GroupedMeanSubscriberBytesPerSec = mean(comparableTests.map(x => x.SubscriberAverageBytesPerSec));
 
-  t.GroupedStandardErrorPublisherMessageRate = standardError(comparableTests.map(x => x.PublisherAverageMsgsPerSec));
-  t.GroupedStandardErrorSubscriberMessageRate =standardError(comparableTests.map(x => x.SubscriberAverageMsgsPerSec));
-  t.GroupedStandardErrorPublisherBytesPerSec = standardError(comparableTests.map(x => x.PublisherAverageBytesPerSec));
-  t.GroupedStandardErrorSubscriberBytesPerSec = standardError(comparableTests.map(x => x.SubscriberAverageBytesPerSec));
+  let group = {
+    Subscribers : t.Subscribers,
+    Publishers : t.Publishers,
+    MessageSize : t.MessageSize,
+  };
+  group.MeanPublisherMessageRate = mean(comparableTests.map(x => x.PublisherAverageMsgsPerSec));
+  group.MeanSubscriberMessageRate = mean(comparableTests.map(x => x.SubscriberAverageMsgsPerSec));
+  group.MeanPublisherBytesPerSec = mean(comparableTests.map(x => x.PublisherAverageBytesPerSec));
+  group.MeanSubscriberBytesPerSec = mean(comparableTests.map(x => x.SubscriberAverageBytesPerSec));
 
-  return t;
-})
+  group.StandardErrorPublisherMessageRate = standardError(comparableTests.map(x => x.PublisherAverageMsgsPerSec));
+  group.StandardErrorSubscriberMessageRate =standardError(comparableTests.map(x => x.SubscriberAverageMsgsPerSec));
+  group.StandardErrorPublisherBytesPerSec = standardError(comparableTests.map(x => x.PublisherAverageBytesPerSec));
+  group.StandardErrorSubscriberBytesPerSec = standardError(comparableTests.map(x => x.SubscriberAverageBytesPerSec));
 
+  return group;
+});
+
+groupedResults = _.uniqBy(groupedResults, g => `${g.MessageSize}-${g.Publishers}-${g.Subscribers}`);
+
+//write grouped tests to disk
+fs.writeFileSync(
+  `${results_folder}/grouped_${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}.json`,
+  JSON.stringify({ groupedResults })
+);
+new ObjectsToCsv(groupedResults).toDisk(
+  `${results_folder}/grouped_${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}.csv`
+);
+
+
+//write all tests to disk
 fs.writeFileSync(
   `${results_folder}/${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}.json`,
   JSON.stringify({ tests })
 );
-
 new ObjectsToCsv(tests).toDisk(
   `${results_folder}/${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}.csv`
 );
