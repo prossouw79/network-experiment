@@ -3,6 +3,7 @@ const fs = require("fs");
 const dateFormat = require("dateformat");
 const _ = require("lodash");
 const ObjectsToCsv = require("objects-to-csv");
+const os = require('os');
 
 let testDate = new Date();
 let results_folder = `results/${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}`;
@@ -10,15 +11,15 @@ shell.exec(`mkdir -p ${results_folder}`);
 let fn = `results/current_tests.json`;
 
 reps = 3;
-servers = ["localhost", "127.0.0.1", "GL553VD"];                                      //local-script-mode
-// servers = ["10.0.0.11", "10.0.0.12", "10.0.0.13"];                                 //mesh-node
+// servers = ["localhost", "127.0.0.1", os.hostname()];                                      //local-script-mode
+servers = ["10.0.0.11", "10.0.0.12", "10.0.0.13"];                                 //mesh-node
 // servers = ["192.168.10.21","192.168.10.22","192.168.10.23"];                       //eth-node
 // servers = ["nats-cluster-node-1", "nats-cluster-node-2", "nats-cluster-node-3"];   //swarm-container
 pubs = [1, 2];
 subs = [0, 1, 2];
 
 const expMin = 0;
-const expMax = 10;
+const expMax = 12;
 const base = 100; //messages sent of the largest size
 
 sizes = [];
@@ -29,7 +30,6 @@ let testSize = sizes[0] * base;
 msgs = sizes.map(x => testSize/x);
 
 console.log('Input Vector:',sizes,msgs)
-
 
 function msConversion(millis) {
   let sec = Math.floor(millis / 1000);
@@ -48,6 +48,22 @@ function msConversion(millis) {
   } else {
     return min + ":" + sec;
   }
+}
+
+function mean(data) {
+  return data.reduce(function (a, b) {
+      return Number(a) + Number(b);
+  }) / data.length;
+};
+
+function standardDeviation (data) {
+  return Math.sqrt(data.reduce(function (sq, n) {
+          return sq + Math.pow(n - mean(data), 2);
+      }, 0) / (data.length - 1));
+};
+
+function standardError(data){
+  return standardDeviation(data) / Math.sqrt(data.length);
 }
 
 topic = "foo";
@@ -150,6 +166,25 @@ tests.forEach(t => {
     console.info("Skipping complete test");
   }
 });
+
+tests = tests.map(function(t){
+  let comparableTests = tests.filter(test => {
+    return test.Subscribers == t.Subscribers &&
+           test.Publishers == t.Publishers &&
+           test.MessageSize == t.MessageSize
+  });
+  t.GroupedMeanPublisherMessageRate = mean(comparableTests.map(x => x.PublisherAverageMsgsPerSec));
+  t.GroupedMeanSubscriberMessageRate = mean(comparableTests.map(x => x.SubscriberAverageMsgsPerSec));
+  t.GroupedMeanPublisherBytesPerSec = mean(comparableTests.map(x => x.PublisherAverageBytesPerSec));
+  t.GroupedMeanSubscriberBytesPerSec = mean(comparableTests.map(x => x.SubscriberAverageBytesPerSec));
+
+  t.GroupedStandardErrorPublisherMessageRate = standardError(comparableTests.map(x => x.PublisherAverageMsgsPerSec));
+  t.GroupedStandardErrorSubscriberMessageRate =standardError(comparableTests.map(x => x.SubscriberAverageMsgsPerSec));
+  t.GroupedStandardErrorPublisherBytesPerSec = standardError(comparableTests.map(x => x.PublisherAverageBytesPerSec));
+  t.GroupedStandardErrorSubscriberBytesPerSec = standardError(comparableTests.map(x => x.SubscriberAverageBytesPerSec));
+
+  return t;
+})
 
 fs.writeFileSync(
   `${results_folder}/${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}.json`,
