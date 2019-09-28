@@ -212,35 +212,3 @@ fs.writeFileSync(
 new ObjectsToCsv(tests).toDisk(
   `${results_folder}/${dateFormat(testDate, "yyyy-mm-dd'T'HH:MM")}.csv`
 );
-
-// //flatten results
-// let flatResults = [];
-//   sizes.forEach(ms => {
-//     servers.forEach(s => {
-//       pubs.forEach(np => {
-//         subs.forEach(ns => {
-//           let filteredResults = _.filter(tests, t => )
-//         });
-//       });
-//     });
-//   });
-
-// sizes.forEach(ms => {
-//   pubs.forEach(np => {
-//     subs.forEach(ns => {
-//       let arr = [];
-//       let filename = `${results_folder}/${ms}-${np}-${ns}.csv`;
-//       let groupedResult = _.filter(tests, function(t) {
-//         return (
-//           t.Output.Subs == ns && t.Output.Pubs == np && t.Output.MsgBytes == ms
-//         );
-//       });
-//       Object.keys(groupedResult).forEach(k => {
-//         arr.push(groupedResult[k]);
-//       });
-
-//       shell.exec(`touch ${filename}`);
-//       new ObjectsToCsv(_.sortBy(arr, l => l.Client)).toDisk(filename);
-//     });
-//   });
-// });
