@@ -12,7 +12,7 @@
     "express": "^4.17.1",
     "http": "0.0.0",
     "jayson": "^3.0.2",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.19",
     "lodash.combinations": "^18.9.19",
     "socket.io": "^2.2.0"
   }
