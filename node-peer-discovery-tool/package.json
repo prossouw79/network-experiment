@@ -12,7 +12,7 @@
     "dns-discovery": "^6.2.3",
     "fs": "0.0.1-security",
     "lodash": "^4.17.11",
-    "minimist": "^1.2.0",
+    "minimist": "^1.2.6",
     "ping": "^0.2.2"
   }
 }
